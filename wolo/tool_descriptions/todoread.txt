@@ -1,0 +1,14 @@
+Read the current todo list to see task progress.
+
+Use this tool to check the current state of your task list.
+
+When to use:
+- To review what tasks are pending, in progress, or completed
+- To decide what to work on next
+- To verify task completion status
+- When resuming work after a pause
+
+The todo list shows:
+- Task ID: Unique identifier for each task
+- Content: Description of the task
+- Status: pending, in_progress, or completed

@@ -1,0 +1,28 @@
+Find files matching a glob pattern.
+
+Features:
+- Fast file search that works with any codebase size
+- Supports standard glob patterns (*, **, ?, [])
+- Returns file paths sorted by modification time (most recent first)
+
+Usage:
+- Use this tool when you need to find files by name or path pattern
+- The pattern parameter accepts glob patterns like "**/*.py", "src/**/*.ts"
+- The path parameter specifies the base directory to search from
+
+Common patterns:
+- "**/*.py" - Find all Python files recursively
+- "*.txt" - Find all .txt files in current directory
+- "src/**/*.{ts,tsx}" - Find all TypeScript files in src directory
+- "**/test_*.py" - Find all test files
+- "**/__init__.py" - Find all Python package init files
+
+When to use Glob vs other tools:
+- Use Glob for finding files by name/path pattern
+- Use Grep for searching file contents
+- Use shell with `find` only for complex queries that glob can't handle
+
+Best practices:
+- Start with broader patterns and narrow down if needed
+- Use ** for recursive searches
+- Combine with Read to examine found files

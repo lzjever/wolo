@@ -1,0 +1,25 @@
+Fast content search tool that works with any codebase size.
+
+Features:
+- Searches file contents using regular expressions
+- Supports full regex syntax (e.g., "log.*Error", "function\s+\w+", "class\s+\w+")
+- Filter files by pattern with the include_pattern parameter (e.g., "*.py", "*.{ts,tsx}")
+- Returns file paths and line numbers with matching content
+- Results are sorted by modification time (most recent first)
+
+Usage:
+- Use this tool when you need to find files containing specific patterns
+- The pattern parameter accepts regular expressions
+- The path parameter specifies where to search (default: current directory)
+- The include_pattern parameter filters which files to search
+
+When to use Grep vs other tools:
+- Use Grep for searching file contents
+- Use Glob for finding files by name/path pattern
+- Use shell with `rg` directly if you need advanced ripgrep features or match counts
+- When doing an open-ended search that may require multiple rounds of searching, consider using the Task tool to delegate
+
+Examples:
+- Find all TODO comments: pattern="TODO|FIXME"
+- Find function definitions: pattern="def \w+\("
+- Find class definitions in Python files: pattern="class \w+", include_pattern="*.py"

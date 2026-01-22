@@ -1,0 +1,23 @@
+Delegate a task to a specialized sub-agent for parallel or focused work.
+
+Usage:
+- Use this tool to spawn a sub-agent that can work on a specific task independently
+- The sub-agent has access to the same tools as the main agent
+- Results are returned when the sub-agent completes its task
+
+Agent types:
+- general: General-purpose agent for most tasks
+- plan: Planning agent for designing implementation approaches (read-only, cannot modify files)
+- explore: Exploration agent for researching and understanding code (read-only)
+
+When to use:
+- When you need to perform multiple independent tasks in parallel
+- When a task requires focused attention without context switching
+- When exploring a large codebase where different areas can be examined independently
+- When the task is well-defined and can be completed without further user input
+
+Best practices:
+- Provide clear, specific goals for the sub-agent
+- Use for tasks that are independent and don't require coordination
+- Don't use for tasks that need user confirmation or interaction
+- Consider using plan agent for complex tasks that need design first

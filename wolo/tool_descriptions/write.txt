@@ -1,0 +1,13 @@
+Writes content to a file, creating it if it doesn't exist or overwriting if it does.
+
+Usage:
+- This tool will overwrite the existing file if there is one at the provided path.
+- If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
+- ALWAYS prefer editing existing files in the codebase using the Edit tool. NEVER write new files unless explicitly required.
+- NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.
+
+When to use Write vs Edit:
+- Use Write when creating a completely new file
+- Use Edit when modifying an existing file (preferred for most cases)
+- If you need to replace most of a file's content, consider using Write, but read the file first

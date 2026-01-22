@@ -1,0 +1,21 @@
+Execute multiple tool calls in parallel for better performance.
+
+Usage:
+- Provide an array of tool calls to execute simultaneously
+- Each tool call specifies the tool name and its arguments
+- Results are returned in the same order as the input
+
+When to use:
+- When you need to perform multiple independent operations
+- When operations don't depend on each other's results
+- To speed up tasks like reading multiple files or running multiple searches
+
+When NOT to use:
+- When operations depend on each other (use sequential calls instead)
+- When you need to process results before the next operation
+- For single operations (just call the tool directly)
+
+Examples:
+- Read multiple files at once
+- Search for multiple patterns in parallel
+- Run multiple independent shell commands

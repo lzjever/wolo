@@ -1,0 +1,25 @@
+Ask the user one or more questions to gather information needed to complete a task.
+
+Use this tool when you need clarification or additional information from the user that cannot be determined from the codebase or context.
+
+Usage:
+- Provide one or more questions in the questions array
+- Each question can optionally include suggested options for the user to choose from
+- The user's answers will be returned in the same order as the questions
+
+When to use:
+- When requirements are ambiguous and you need clarification
+- When there are multiple valid approaches and user preference matters
+- When you need specific information (e.g., API keys, configuration values)
+- When the task involves subjective decisions
+
+When NOT to use:
+- When the answer can be found in the codebase
+- When you can make a reasonable default choice
+- For trivial decisions that don't significantly impact the outcome
+
+Best practices:
+- Ask specific, focused questions
+- Provide helpful options when applicable
+- Group related questions together
+- Explain why you need the information if not obvious

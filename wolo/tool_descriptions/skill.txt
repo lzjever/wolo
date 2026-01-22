@@ -1,0 +1,15 @@
+Load a skill to get detailed instructions for a specific task.
+
+Skills provide specialized knowledge and step-by-step guidance for common tasks. Use this when a task matches an available skill's description.
+
+Usage:
+- Check the available_skills list in the tool description to see what skills are available
+- Call this tool with the skill name to load its detailed instructions
+- Follow the loaded instructions to complete the task
+
+When to use:
+- When the task matches an available skill's description
+- When you need specialized guidance for a particular type of work
+- When the skill provides relevant context or best practices
+
+The skill content will be returned as the tool output, containing detailed instructions and guidance for the specific task type.

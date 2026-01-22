@@ -1,0 +1,17 @@
+Apply multiple edits to files in a single operation. Each edit specifies a file, old text, and new text.
+
+Usage:
+- You MUST use the Read tool to read files before editing them.
+- Each edit follows the same rules as the single Edit tool.
+- Edits are applied in order, so later edits can depend on earlier ones.
+- If any edit fails, the operation stops and reports the error.
+
+When to use:
+- When you need to make multiple related changes across one or more files
+- When changes are interdependent and should be applied together
+- For refactoring operations that touch multiple locations
+
+Best practices:
+- Group related edits together
+- Order edits logically (e.g., imports before usage)
+- Include enough context in each old_text to uniquely identify the location

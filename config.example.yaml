@@ -1,0 +1,153 @@
+# Wolo Configuration Example
+
+This is an example configuration file for Wolo. Copy this to `~/.wolo/config.yaml` and customize it for your needs.
+
+```yaml
+# ============================================================================
+# Wolo Configuration File
+# Location: ~/.wolo/config.yaml
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# API Endpoints
+# ----------------------------------------------------------------------------
+# Define multiple endpoints for different models or providers.
+# Use the endpoint name with --endpoint flag or set default_endpoint.
+
+endpoints:
+  # Default endpoint
+  - name: default
+    model: glm-4
+    api_base: https://open.bigmodel.cn/api/paas/v4
+    api_key: your-api-key-here  # Or use ${GLM_API_KEY} to read from env
+    temperature: 0.7
+    max_tokens: 16384
+  
+  # High-capacity endpoint
+  - name: plus
+    model: glm-4-plus
+    api_base: https://open.bigmodel.cn/api/paas/v4
+    api_key: ${GLM_API_KEY}  # Environment variable reference
+    temperature: 0.8
+    max_tokens: 32768
+
+# Default endpoint to use if not specified via --endpoint
+default_endpoint: default
+
+# ----------------------------------------------------------------------------
+# MCP Servers
+# ----------------------------------------------------------------------------
+# List of MCP server names to enable.
+# These servers must be configured in the mcp.servers section below.
+
+mcp_servers:
+  - filesystem
+  - github
+
+# ----------------------------------------------------------------------------
+# Claude Compatibility
+# ----------------------------------------------------------------------------
+# Import skills and MCP servers from Claude configuration.
+
+claude:
+  enabled: false  # Set to true to enable Claude compatibility
+  config_dir: ~/.claude  # Claude config directory
+  
+  # What to import from Claude
+  skills:
+    enabled: true  # Import skills
+  mcp:
+    enabled: true  # Import MCP servers
+  
+  # Node.js handling strategy
+  # Options: auto, require, skip, python_fallback
+  node_strategy: auto
+
+# ----------------------------------------------------------------------------
+# MCP Configuration
+# ----------------------------------------------------------------------------
+# Configure Model Context Protocol servers.
+
+mcp:
+  enabled: true
+  
+  # Node.js handling strategy
+  # - auto: Auto-detect and use Node.js if available
+  # - require: Require Node.js, fail if not available
+  # - skip: Skip Node.js-based servers
+  # - python_fallback: Use Python fallback implementations
+  node_strategy: auto
+  
+  # Server configurations
+  servers:
+    # Filesystem server example
+    filesystem:
+      command: npx
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-filesystem"
+        - "/path/to/allowed/directory"
+    
+    # GitHub server example
+    github:
+      command: npx
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-github"
+      env:
+        GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}  # Read from env
+
+# ----------------------------------------------------------------------------
+# GLM Thinking Mode
+# ----------------------------------------------------------------------------
+# Enable GLM thinking mode for enhanced reasoning capabilities.
+
+enable_think: false  # Set to true to enable thinking mode
+
+# ----------------------------------------------------------------------------
+# History Compaction
+# ----------------------------------------------------------------------------
+# Configure how Wolo manages long conversation histories.
+
+compaction:
+  # Master settings
+  enabled: true  # Enable/disable compaction
+  auto_compact: true  # Automatically trigger compaction when needed
+  check_interval_steps: 3  # Check every N steps
+  overflow_threshold: 0.9  # Trigger when token usage exceeds 90% of limit
+  reserved_tokens: 2000  # Reserve tokens for system prompt and responses
+  
+  # Summary Compaction Policy
+  # Compacts old messages by generating an LLM summary
+  summary_policy:
+    enabled: true
+    recent_exchanges_to_keep: 6  # Keep last 6 user-assistant exchanges
+    summary_max_tokens: null  # null = no limit, or set max tokens for summary
+    summary_prompt_template: ""  # Custom prompt (empty = use default)
+    include_tool_calls_in_summary: true  # Include tool call info
+  
+  # Tool Output Pruning Policy
+  # Selectively removes old tool outputs while preserving metadata
+  tool_pruning_policy:
+    enabled: true
+    protect_recent_turns: 2  # Protect last 2 turns from pruning
+    protect_token_threshold: 40000  # Start pruning after this token count
+    minimum_prune_tokens: 20000  # Minimum tokens to prune (skip if less)
+    protected_tools: []  # Tool names that should never be pruned
+    # Example: protected_tools: ["read", "write"]  # Protect read/write tools
+    replacement_text: "[Output pruned to save context space]"
+  
+  # Policy Priority
+  # Higher values = executed first
+  # Tool pruning (lighter) runs before summary (heavier)
+  policy_priority:
+    tool_pruning: 50
+    summary: 100
+
+# ----------------------------------------------------------------------------
+# Notes
+# ----------------------------------------------------------------------------
+# - Environment variables can be referenced using ${VAR_NAME} syntax
+# - Comments (lines starting with #) are ignored
+# - All fields are optional - defaults will be used if omitted
+# - Invalid values will cause errors on startup with clear messages

@@ -1,0 +1,31 @@
+Update the todo list for tracking task progress.
+
+Use this tool to create and manage a structured task list for your current session. This helps track progress, organize complex tasks, and demonstrate thoroughness.
+
+When to use:
+- Complex multi-step tasks (3+ distinct steps)
+- Non-trivial tasks requiring careful planning
+- User explicitly requests todo list
+- User provides multiple tasks (numbered/comma-separated)
+- After receiving new instructions - capture requirements as todos
+- After completing tasks - mark complete and add follow-ups
+- When starting new tasks - mark as in_progress
+
+When NOT to use:
+- Single, straightforward tasks
+- Trivial tasks with no organizational benefit
+- Tasks completable in < 3 trivial steps
+- Purely conversational/informational requests
+
+Task states:
+- pending: Not yet started
+- in_progress: Currently working on (only ONE at a time)
+- completed: Finished successfully
+
+Best practices:
+- Create specific, actionable items
+- Break complex tasks into manageable steps
+- Update status in real-time
+- Mark complete IMMEDIATELY after finishing
+- Only ONE task in_progress at a time
+- Complete current tasks before starting new ones

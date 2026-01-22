@@ -152,10 +152,14 @@ USAGE:
 SUBCOMMANDS:
     list-endpoints   List configured endpoints
     show             Show current configuration
+    docs             Show configuration documentation
+    example          Show example configuration file
 
 EXAMPLES:
     wolo config list-endpoints
     wolo config show
+    wolo config docs
+    wolo config example
 """
         print(help_text)
     elif command == "debug":
@@ -163,6 +167,11 @@ EXAMPLES:
 
 USAGE:
     wolo debug <subcommand> [options]
+
+SUBCOMMANDS:
+    llm <file>       Show usage for LLM debugging (use --debug-llm flag instead)
+    full <dir>       Show usage for full debug (use --debug-full flag instead)
+    benchmark        Show usage for benchmark mode (use --benchmark flag instead)
 
 Note: Debug options are typically used as execution flags:
 
@@ -308,9 +317,44 @@ List all configured endpoints from ~/.wolo/config.yaml
 
 Show the current configuration file contents.
 """)
+        elif subcommand == "docs":
+            print("""wolo config docs
+
+Show the full configuration documentation.
+""")
+        elif subcommand == "example":
+            print("""wolo config example
+
+Show an example configuration file that can be saved to ~/.wolo/config.yaml
+""")
         else:
             show_command_help("config")
     elif command == "debug":
-        show_command_help("debug")
+        if subcommand == "llm":
+            print("""wolo debug llm <file>
+
+Show usage information for LLM debugging.
+Note: Use 'wolo --debug-llm <file> "your prompt"' instead.
+
+This subcommand is provided for reference only.
+""")
+        elif subcommand == "full":
+            print("""wolo debug full <dir>
+
+Show usage information for full debug mode.
+Note: Use 'wolo --debug-full <dir> "your prompt"' instead.
+
+This subcommand is provided for reference only.
+""")
+        elif subcommand == "benchmark":
+            print("""wolo debug benchmark
+
+Show usage information for benchmark mode.
+Note: Use 'wolo --benchmark "your prompt"' instead.
+
+This subcommand is provided for reference only.
+""")
+        else:
+            show_command_help("debug")
     else:
         show_main_help()

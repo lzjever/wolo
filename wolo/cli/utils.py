@@ -2,9 +2,25 @@
 CLI utility functions for Wolo.
 """
 
+import sys
 from datetime import datetime
 
+from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
+
+
+def show_first_run_message() -> None:
+    """
+    Display first-run message to user.
+
+    Prints message to stderr and exits with CONFIG_ERROR code.
+    This function does NOT return - it calls sys.exit().
+    """
+    print(
+        "Wolo is not configured. Please run 'wolo config init' to set up your configuration.",
+        file=sys.stderr,
+    )
+    sys.exit(ExitCode.CONFIG_ERROR)
 
 
 def get_message_from_sources(args: ParsedArgs) -> tuple[str, bool]:

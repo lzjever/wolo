@@ -1,7 +1,13 @@
+import getpass
+import os
 import sys
+import tempfile
 from pathlib import Path
 
+import yaml
+
 from wolo.cli.commands.base import BaseCommand
+from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
 
 
@@ -20,7 +26,9 @@ class ConfigCommandGroup(BaseCommand):
         """Route to subcommand."""
         subcommand = args.subcommand
 
-        if subcommand == "list-endpoints":
+        if subcommand == "init":
+            return ConfigInitCommand().execute(args)
+        elif subcommand == "list-endpoints":
             return ConfigListEndpointsCommand().execute(args)
         elif subcommand == "show":
             return ConfigShowCommand().execute(args)
@@ -30,7 +38,9 @@ class ConfigCommandGroup(BaseCommand):
             return ConfigExampleCommand().execute(args)
         else:
             print(f"Error: Unknown subcommand '{subcommand}'", file=sys.stderr)
-            print("Available subcommands: list-endpoints, show, docs, example", file=sys.stderr)
+            print(
+                "Available subcommands: init, list-endpoints, show, docs, example", file=sys.stderr
+            )
             return 1
 
 
@@ -150,3 +160,124 @@ class ConfigDocsCommand(BaseCommand):
 
         print(docs_path.read_text())
         return 0
+
+
+class ConfigInitCommand(BaseCommand):
+    """wolo config init"""
+
+    @property
+    def name(self) -> str:
+        return "config init"
+
+    @property
+    def description(self) -> str:
+        return "Initialize Wolo configuration (first-time setup)"
+
+    def execute(self, args: ParsedArgs) -> int:
+        """Execute init command."""
+        # Step 1: Define Constants
+        config_dir = Path.home() / ".wolo"
+        config_file = config_dir / "config.yaml"
+
+        # Step 2: Check if Config Already Exists
+        from wolo.config import Config
+
+        if not Config.is_first_run():
+            # Config exists - show error and exit
+            config_path = Path.home() / ".wolo" / "config.yaml"
+            print(
+                f"Error: Configuration file already exists at {config_path}",
+                file=sys.stderr,
+            )
+            print(
+                "If you want to reinitialize, please delete the current config file first.",
+                file=sys.stderr,
+            )
+            print(f"  rm {config_path}", file=sys.stderr)
+            return ExitCode.ERROR
+
+        # Step 3: Get User Input (Interactive Mode)
+        # Prompt for API endpoint URL
+        api_base = input("API Endpoint URL: ").strip()
+        if not api_base:
+            print("Error: API endpoint URL is required", file=sys.stderr)
+            return ExitCode.ERROR
+
+        # Validate URL format
+        if not (api_base.startswith("http://") or api_base.startswith("https://")):
+            print(
+                "Error: API endpoint URL must start with http:// or https://",
+                file=sys.stderr,
+            )
+            return ExitCode.ERROR
+
+        # Prompt for API key
+        api_key = getpass.getpass("API Key: ").strip()
+        if not api_key:
+            print("Error: API key is required", file=sys.stderr)
+            return ExitCode.ERROR
+
+        # Prompt for model name
+        model = input("Model name: ").strip()
+        if not model:
+            print("Error: Model name is required", file=sys.stderr)
+            return ExitCode.ERROR
+
+        # Step 4: Create Config Directory
+        try:
+            config_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            print(
+                f"Error: Failed to create config directory {config_dir}: {e}",
+                file=sys.stderr,
+            )
+            return ExitCode.CONFIG_ERROR
+
+        # Step 5: Create Config Data Structure
+        config_data = {
+            "endpoints": [
+                {
+                    "name": "default",
+                    "model": model,
+                    "api_base": api_base,
+                    "api_key": api_key,
+                    "temperature": 0.7,
+                    "max_tokens": 16384,
+                }
+            ],
+            "default_endpoint": "default",
+        }
+
+        # Step 6: Write Config File (Atomic)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=config_dir,
+                delete=False,
+                suffix=".yaml.tmp",
+            ) as tmp_file:
+                tmp_path = Path(tmp_file.name)
+                yaml.dump(config_data, tmp_file, default_flow_style=False, sort_keys=False)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+
+            # Atomic rename
+            tmp_path.replace(config_file)
+        except (OSError, yaml.YAMLError) as e:
+            # Clean up temp file if it exists
+            if tmp_path and tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
+
+            print(
+                f"Error: Failed to write config file {config_file}: {e}",
+                file=sys.stderr,
+            )
+            return ExitCode.CONFIG_ERROR
+
+        # Step 7: Success Message
+        print(f"Configuration initialized successfully at {config_file}")
+        return ExitCode.SUCCESS

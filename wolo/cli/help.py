@@ -77,16 +77,21 @@ QUICK COMMANDS:
 
 OTHER OPTIONS:
     -a, --agent <type>      Agent: general, plan, explore, compaction
-    -e, --endpoint <name>   Use configured endpoint
-    -m, --model <model>     Override model
+    -b, --baseurl <url>     LLM service base URL (direct, bypasses config file)
+    -m, --model <model>     Model name (required if using --baseurl)
     -n, --max-steps <n>     Max steps (default: 100)
     -L, --log-level <lvl>   DEBUG, INFO, WARNING, ERROR
     -S, --save              Force save session on completion
+    --api-key <key>         API key (required if using --baseurl)
+
+    If --baseurl is specified, all three (--baseurl, --model, --api-key) are required.
+    Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
 
 DEBUG OPTIONS:
     --debug-llm <file>      Log LLM requests/responses
     --debug-full <dir>      Save full JSON request/response
     --benchmark             Enable benchmark mode
+    --benchmark-output <f>  Benchmark output file (default: benchmark_results.json)
 
 EXAMPLES:
     wolo "fix the bug in main.py"
@@ -102,6 +107,11 @@ SESSION MANAGEMENT:
     wolo session watch <id>         Watch running session
     wolo session delete <id>        Delete session
     wolo session clean [days]       Clean old sessions
+
+CONFIGURATION:
+    wolo config init           Initialize configuration (first-time setup)
+    wolo config list-endpoints List configured endpoints
+    wolo config show           Show current configuration
 
 See 'wolo <command> -h' for more information on a command.
 """
@@ -150,12 +160,14 @@ USAGE:
     wolo config <subcommand>
 
 SUBCOMMANDS:
-    list-endpoints   List configured endpoints
-    show             Show current configuration
-    docs             Show configuration documentation
-    example          Show example configuration file
+    init                Initialize Wolo configuration (first-time setup)
+    list-endpoints      List configured endpoints
+    show                Show current configuration
+    docs                Show configuration documentation
+    example             Show example configuration file
 
 EXAMPLES:
+    wolo config init
     wolo config list-endpoints
     wolo config show
     wolo config docs
@@ -184,10 +196,14 @@ Note: Debug options are typically used as execution flags:
     wolo --benchmark "your prompt"
         Enable benchmark mode and export metrics
 
+    wolo --benchmark --benchmark-output <file> "your prompt"
+        Enable benchmark mode with custom output file
+
 EXAMPLES:
     wolo --debug-llm llm.log "fix bug"
     wolo --debug-full ./debug "implement feature"
     wolo --benchmark "run tests"
+    wolo --benchmark --benchmark-output custom.json "run tests"
 """
         print(help_text)
     elif command in ("chat", "repl"):
@@ -207,9 +223,10 @@ OPTIONS:
     --coop              Enable AI questions (default in REPL)
     -s, --session <n>   Use named session
     -a, --agent <type>  Agent type
-    -e, --endpoint <n>  Use endpoint
-    -m, --model <m>     Override model
+    -b, --baseurl <url> LLM service base URL (direct, bypasses config file)
+    -m, --model <m>     Model name (required if using --baseurl)
     -n, --max-steps <n> Max steps per turn
+    --api-key <key>     API key (required if using --baseurl)
 
 REPL COMMANDS:
     /exit, /quit        Exit REPL
@@ -307,7 +324,24 @@ EXAMPLES:
         else:
             show_command_help("session")
     elif command == "config":
-        if subcommand == "list-endpoints":
+        if subcommand == "init":
+            print("""wolo config init
+
+Initialize Wolo configuration for first-time setup.
+This command will prompt you for:
+  - API Endpoint URL (must start with http:// or https://)
+  - API Key
+  - Model name
+
+The configuration will be saved to ~/.wolo/config.yaml
+
+If a configuration file already exists, this command will show an error
+and exit. To reinitialize, delete the existing config file first.
+
+EXAMPLES:
+    wolo config init
+""")
+        elif subcommand == "list-endpoints":
             print("""wolo config list-endpoints
 
 List all configured endpoints from ~/.wolo/config.yaml
@@ -351,6 +385,7 @@ This subcommand is provided for reference only.
 
 Show usage information for benchmark mode.
 Note: Use 'wolo --benchmark "your prompt"' instead.
+Use 'wolo --benchmark --benchmark-output <file> "your prompt"' for custom output file.
 
 This subcommand is provided for reference only.
 """)

@@ -136,6 +136,9 @@ Quick commands:
   wolo -w <id>                          Watch running session
   wolo -h                               Full help
 
+Configuration:
+  wolo config init            Initialize configuration (first-time setup)
+
 Examples:
   wolo "fix the bug in main.py"
   git diff | wolo "write commit message"

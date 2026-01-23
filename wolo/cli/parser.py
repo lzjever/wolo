@@ -25,7 +25,7 @@ SHORT_OPTIONS = {
     "-S": "--save",
     "-h": "--help",
     "-a": "--agent",
-    "-e": "--endpoint",
+    "-b": "--baseurl",
     "-m": "--model",
     "-L": "--log-level",
     "-n": "--max-steps",
@@ -41,8 +41,8 @@ OPTIONS_NEEDING_VALUE = {
     "-w",
     "--agent",
     "-a",
-    "--endpoint",
-    "-e",
+    "--baseurl",
+    "-b",
     "--model",
     "-m",
     "--log-level",
@@ -89,7 +89,7 @@ class ExecutionOptions:
 
     mode: ExecutionMode = ExecutionMode.SOLO  # Default changed to SOLO
     agent_type: str = "general"
-    endpoint_name: str | None = None
+    base_url: str | None = None  # Direct LLM service base URL (bypasses config file)
     api_key: str | None = None
     model: str | None = None
     max_steps: int = 100
@@ -302,6 +302,9 @@ class FlexibleArgumentParser:
                 # Positional argument or option value
                 if option_expecting_value:
                     options[option_expecting_value] = arg
+                    # Also store with -- prefix for lookup
+                    if not option_expecting_value.startswith("--"):
+                        options[f"--{option_expecting_value}"] = arg
                     option_expecting_value = None
                 else:
                     positional.append(arg)
@@ -412,8 +415,8 @@ class FlexibleArgumentParser:
             result.execution_options.agent_type = (
                 options.get("--agent") or options.get("-a") or "general"
             )
-        if "--endpoint" in options or "-e" in options:
-            result.execution_options.endpoint_name = options.get("--endpoint") or options.get("-e")
+        if "--baseurl" in options or "-b" in options:
+            result.execution_options.base_url = options.get("--baseurl") or options.get("-b")
         if "--model" in options or "-m" in options:
             result.execution_options.model = options.get("--model") or options.get("-m")
         if "--max-steps" in options or "-n" in options:

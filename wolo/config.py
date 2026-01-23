@@ -83,6 +83,47 @@ class Config:
             return {}
 
     @classmethod
+    def is_first_run(cls) -> bool:
+        """
+        Check if this is the first run of Wolo (no config file exists).
+
+        Returns:
+            True if ~/.wolo/config.yaml does not exist or is empty/invalid
+            False if valid config file exists
+        """
+        config_path = Path.home() / ".wolo" / "config.yaml"
+
+        # Check file existence
+        if not config_path.exists() or not config_path.is_file():
+            return True
+
+        # Check file is not empty
+        try:
+            if config_path.stat().st_size == 0:
+                return True
+        except OSError:
+            # Can't stat file, treat as first run
+            return True
+
+        # Check file is valid YAML and has endpoints
+        try:
+            config_data = cls._load_config_file()
+            # If load returns empty dict, treat as first run
+            if not config_data:
+                return True
+
+            # Check if endpoints exist and is not empty
+            endpoints = config_data.get("endpoints", [])
+            if not endpoints or not isinstance(endpoints, list) or len(endpoints) == 0:
+                return True
+
+            # Valid config with endpoints exists
+            return False
+        except Exception:
+            # Any exception means invalid config, treat as first run
+            return True
+
+    @classmethod
     def _get_endpoints(cls) -> list[EndpointConfig]:
         """Get all configured endpoints from config file."""
         config_data = cls._load_config_file()
@@ -110,25 +151,105 @@ class Config:
         return [ep.name for ep in endpoints]
 
     @classmethod
-    def from_env(cls, api_key: str | None = None, endpoint_name: str | None = None) -> "Config":
-        # Try to load from config file first
-        endpoints = cls._get_endpoints()
+    def from_env(
+        cls,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+    ) -> "Config":
+        """
+        Load configuration from environment and CLI arguments.
+
+        Args:
+            api_key: API key from CLI (overrides config)
+            base_url: Base URL from CLI (if provided, bypasses config file)
+            model: Model name from CLI (overrides config)
+
+        Returns:
+            Config instance
+
+        Behavior:
+            - If base_url is provided, all three (base_url, api_key, model) are required.
+              This bypasses the config file completely.
+            - Otherwise, uses endpoints from config file or environment variables.
+        """
         config_data = cls._load_config_file()
+
+        # Direct mode: if base_url is provided, bypass config file
+        if base_url:
+            if not api_key:
+                raise ValueError(
+                    "When using --baseurl, --api-key is required. "
+                    "Please provide both --baseurl and --api-key, or use config file."
+                )
+            if not model:
+                raise ValueError(
+                    "When using --baseurl, --model is required. "
+                    "Please provide --baseurl, --api-key, and --model, or use config file."
+                )
+
+            # Use direct CLI parameters, load other settings from config or defaults
+            # Load MCP servers from config file or environment variable
+            mcp_servers = config_data.get("mcp_servers", [])
+            if not mcp_servers:
+                mcp_env = os.getenv("WOLO_MCP_SERVERS", "")
+                mcp_servers = [s.strip() for s in mcp_env.split(",") if s.strip()]
+
+            # Load Claude compatibility config
+            claude_data = config_data.get("claude", {})
+            claude_config = ClaudeCompatConfig(
+                enabled=claude_data.get("enabled", False),
+                config_dir=Path(claude_data["config_dir"])
+                if claude_data.get("config_dir")
+                else None,
+                load_skills=claude_data.get("skills", {}).get("enabled", True)
+                if isinstance(claude_data.get("skills"), dict)
+                else claude_data.get("load_skills", True),
+                load_mcp=claude_data.get("mcp", {}).get("enabled", True)
+                if isinstance(claude_data.get("mcp"), dict)
+                else claude_data.get("load_mcp", True),
+                node_strategy=claude_data.get("node_strategy", "auto"),
+            )
+
+            # Load MCP config
+            mcp_data = config_data.get("mcp", {})
+            mcp_config = MCPConfig(
+                enabled=mcp_data.get("enabled", True),
+                node_strategy=mcp_data.get("node_strategy", "auto"),
+                servers=mcp_data.get("servers", {}),
+            )
+
+            # Load enable_think from config or env
+            enable_think = config_data.get("enable_think", False)
+            if not enable_think:
+                enable_think = os.getenv("WOLO_ENABLE_THINK", "").lower() in ("true", "1", "yes")
+
+            # Load compaction config
+            from wolo.compaction.config import load_compaction_config
+
+            compaction_data = config_data.get("compaction", {})
+            compaction_config = load_compaction_config(compaction_data)
+
+            return cls(
+                api_key=api_key,
+                model=model,
+                base_url=base_url,
+                temperature=0.7,  # Default
+                max_tokens=16384,  # Default
+                mcp_servers=mcp_servers,
+                enable_think=enable_think,
+                claude=claude_config,
+                mcp=mcp_config,
+                compaction=compaction_config,
+            )
+
+        # Config file mode: use endpoints from config file
+        endpoints = cls._get_endpoints()
 
         # Determine which endpoint to use
         selected_endpoint: EndpointConfig | None = None
 
-        if endpoint_name:
-            # User specified endpoint via --endpoint
-            for ep in endpoints:
-                if ep.name == endpoint_name:
-                    selected_endpoint = ep
-                    break
-            if not selected_endpoint:
-                raise ValueError(
-                    f"Endpoint '{endpoint_name}' not found in config file. Available: {', '.join(ep.name for ep in endpoints)}"
-                )
-        elif endpoints:
+        if endpoints:
             # Use default endpoint from config, or first endpoint
             default_name = config_data.get("default_endpoint")
             if default_name:
@@ -142,8 +263,8 @@ class Config:
         # Build config from selected endpoint or fallback to env vars
         if selected_endpoint:
             key = api_key or selected_endpoint.api_key
-            model = selected_endpoint.model
-            base_url = selected_endpoint.api_base
+            model_name = model or selected_endpoint.model
+            base_url_from_config = selected_endpoint.api_base
             temperature = selected_endpoint.temperature
             max_tokens = selected_endpoint.max_tokens
         else:
@@ -154,8 +275,10 @@ class Config:
                     "No API key configured. Please set GLM_API_KEY environment variable "
                     "or configure endpoints in ~/.wolo/config.yaml"
                 )
-            model = os.getenv("WOLO_MODEL", "glm-4")
-            base_url = os.getenv("WOLO_API_BASE", "https://open.bigmodel.cn/api/paas/v4")
+            model_name = model or os.getenv("WOLO_MODEL", "glm-4")
+            base_url_from_config = os.getenv(
+                "WOLO_API_BASE", "https://open.bigmodel.cn/api/paas/v4"
+            )
             temperature = float(os.getenv("WOLO_TEMPERATURE", "0.7"))
             max_tokens = int(os.getenv("WOLO_MAX_TOKENS", "16384"))
 
@@ -200,8 +323,8 @@ class Config:
 
         return cls(
             api_key=key,
-            model=model,
-            base_url=base_url,
+            model=model_name,
+            base_url=base_url_from_config,
             temperature=temperature,
             max_tokens=max_tokens,
             mcp_servers=mcp_servers,

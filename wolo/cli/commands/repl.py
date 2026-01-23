@@ -30,6 +30,14 @@ class ReplCommand(BaseCommand):
 
     def execute(self, args: ParsedArgs) -> int:
         """Execute repl command."""
+        # Check for first run
+        from wolo.config import Config
+
+        if Config.is_first_run():
+            from wolo.cli.utils import show_first_run_message
+
+            show_first_run_message()
+
         # Get initial message if provided
         message, _ = get_message_from_sources(args)
 
@@ -47,10 +55,10 @@ class ReplCommand(BaseCommand):
         # Setup configuration
         try:
             config = Config.from_env(
-                args.execution_options.api_key, args.execution_options.endpoint_name
+                api_key=args.execution_options.api_key,
+                base_url=args.execution_options.base_url,
+                model=args.execution_options.model,
             )
-            if args.execution_options.model:
-                config.model = args.execution_options.model
             config.debug_llm_file = args.execution_options.debug_llm_file
             config.debug_full_dir = args.execution_options.debug_full_dir
 

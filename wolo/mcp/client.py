@@ -20,6 +20,11 @@ from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.types import Tool as MCPToolType
 
+try:
+    from builtins import BaseExceptionGroup
+except ImportError:
+    from exceptiongroup import BaseExceptionGroup
+
 logger = logging.getLogger(__name__)
 
 # Suppress MCP server stderr output by redirecting to /dev/null

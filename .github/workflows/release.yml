@@ -1,17 +1,15 @@
-# Build, create GitHub Release, and publish mbos-wolo to PyPI.
-# Trigger: push tag v* (e.g. v0.1.0) or workflow_dispatch.
-# Required: Add secret PYPI_API_TOKEN (PyPI API token) in repo Settings > Secrets.
-
 name: Build and Release
 
 on:
   push:
     tags:
-      - "v*"
-  workflow_dispatch:
+      - 'v*'  # Trigger on tags starting with 'v'
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual triggering
     inputs:
       version:
-        description: "Version tag (e.g., v0.1.0)"
+        description: 'Version tag (e.g., v0.1.0)'
         required: true
         type: string
 
@@ -19,17 +17,19 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: write  # Required for creating releases and uploading assets
+      id-token: write  # For trusted publishing to PyPI (optional)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for release notes generation
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install build dependencies
         run: |
@@ -39,11 +39,15 @@ jobs:
       - name: Get version from tag
         id: get_version
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            # Extract version from tag ref (refs/tags/v0.1.0 -> v0.1.0)
             VERSION="${{ github.ref_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
           fi
+          # Remove 'v' prefix if present
           VERSION=${VERSION#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
@@ -51,38 +55,62 @@ jobs:
 
       - name: Verify version matches package
         run: |
-          PACKAGE_VERSION=$(python -c "import re; f=open('pyproject.toml'); c=f.read(); f.close(); m=re.search(r'^version\s*=\s*[\"']([^\"']+)[\"']', c, re.M); print(m.group(1) if m else '')")
-          EXPECTED="${{ steps.get_version.outputs.version }}"
+          # Extract version from __init__.py without importing the package (to avoid dependency issues)
+          PACKAGE_VERSION=$(python -c "import re; content = open('wolo/__init__.py').read(); match = re.search(r\"__version__\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]\", content); print(match.group(1) if match else '')")
+          EXPECTED_VERSION="${{ steps.get_version.outputs.version }}"
           if [ -z "$PACKAGE_VERSION" ]; then
-            echo "Error: Could not read version from pyproject.toml"
+            echo "Error: Failed to extract version from wolo/__init__.py"
             exit 1
           fi
-          if [ "$PACKAGE_VERSION" != "$EXPECTED" ]; then
-            echo "Error: pyproject.toml version ($PACKAGE_VERSION) != tag ($EXPECTED)"
+          if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Error: Package version ($PACKAGE_VERSION) doesn't match tag version ($EXPECTED_VERSION)"
             exit 1
           fi
-          echo "Version OK: $PACKAGE_VERSION"
+          echo "✓ Version match: $PACKAGE_VERSION"
 
       - name: Build package
-        run: python -m build
+        run: |
+          python -m build
 
       - name: Check package
-        run: twine check dist/*
+        run: |
+          twine check dist/*
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+
+          # Generate release notes using the script
+          RELEASE_NOTES_FILE=$(mktemp)
+          python3 scripts/generate_release_notes.py "$VERSION" "$RELEASE_NOTES_FILE"
+
+          # Output to GITHUB_OUTPUT using multiline format
+          # Use a unique delimiter to avoid conflicts with file content
+          DELIMITER="RELEASE_NOTES_$(date +%s)_$$"
+          {
+            echo "notes<<${DELIMITER}"
+            cat "$RELEASE_NOTES_FILE"
+            echo ""
+            echo "${DELIMITER}"
+          } >> $GITHUB_OUTPUT
+
+          # Cleanup
+          rm -f "$RELEASE_NOTES_FILE"
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
           name: Release ${{ steps.get_version.outputs.tag }}
-          body: |
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.tag }}/CHANGELOG.md) for details.
+          body: ${{ steps.release_notes.outputs.notes }}
           files: dist/*
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to PyPI
+      - name: Publish to PyPI (Optional)
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
@@ -91,5 +119,5 @@ jobs:
             echo "PYPI_API_TOKEN not set, skipping PyPI upload"
             exit 0
           fi
-          echo "Publishing mbos-wolo to PyPI..."
+          echo "Publishing to PyPI..."
           twine upload dist/*

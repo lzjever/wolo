@@ -20,6 +20,11 @@ from ..claude.mcp_config import MCPServerConfig
 from .client import MCPClient, MCPError, MCPTool
 from .node_check import NodeNotAvailableError, check_npx_available
 
+try:
+    from builtins import BaseExceptionGroup
+except ImportError:
+    from exceptiongroup import BaseExceptionGroup
+
 logger = logging.getLogger(__name__)
 
 

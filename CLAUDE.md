@@ -191,3 +191,20 @@ Running shell processes are tracked for Ctrl+S viewing (`get_shell_status()`). C
 ## Error Handling
 
 `wolo/errors.py` classifies API errors and provides user-friendly messages. Retry strategy is determined by error type.
+
+## Package Management
+
+Wolo follows the same packaging approach as [lexilux](https://github.com/lzjever/lexilux):
+
+- **Version management**: Version is defined in `wolo/__init__.py` as `__version__` and dynamically read by setuptools
+- **Build system**: Uses `setuptools` with `dynamic = ["version"]` in pyproject.toml
+- **Release workflow**: GitHub Actions reads version from `__init__.py` using regex (not from pyproject.toml)
+
+### Local Lexilux Reference
+
+The lexilux development branch is available locally at:
+```
+/home/percy/works/mygithub/mbos-agent/lexilux
+```
+
+Use this as a reference when aligning packaging, CI/CD, or other implementation patterns with lexilux.

@@ -16,6 +16,11 @@ from .config import Config
 from .mcp import MCPServerManager, check_npx_available
 from .tool_registry import ToolCategory, ToolSpec, get_registry
 
+try:
+    from builtins import BaseExceptionGroup
+except ImportError:
+    from exceptiongroup import BaseExceptionGroup
+
 logger = logging.getLogger(__name__)
 
 

@@ -7,6 +7,11 @@ import logging
 from collections.abc import Awaitable
 from typing import TypeVar
 
+try:
+    from builtins import BaseExceptionGroup
+except ImportError:
+    from exceptiongroup import BaseExceptionGroup
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")

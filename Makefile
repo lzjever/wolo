@@ -84,19 +84,19 @@ benchmark-all:
 	$(PYTHON_CMD) -m wolo.tests.benchmark
 
 test:
-	$(PYTHON_CMD) -m pytest wolo/tests/ -v
+	$(PYTHON_CMD) -m pytest tests/ wolo/tests/ -v -n auto
 
 test-cov:
-	$(PYTHON_CMD) -m pytest wolo/tests/ -v --cov=wolo --cov-report=html --cov-report=term
+	$(PYTHON_CMD) -m pytest tests/ wolo/tests/ -v -n auto --cov=wolo --cov-report=html --cov-report=term
 
 lint:
-	$(PYTHON_CMD) -m ruff check wolo/ --output-format=concise --no-fix
+	$(PYTHON_CMD) -m ruff check wolo/ tests/ --output-format=concise --no-fix
 
 format:
-	$(PYTHON_CMD) -m ruff format wolo/
+	$(PYTHON_CMD) -m ruff format wolo/ tests/
 
 format-check:
-	$(PYTHON_CMD) -m ruff format --check wolo/
+	$(PYTHON_CMD) -m ruff format --check wolo/ tests/
 
 check: lint format-check test
 	@echo "All checks passed!"

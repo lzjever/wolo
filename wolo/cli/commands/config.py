@@ -1,24 +1,25 @@
 import sys
 from pathlib import Path
+
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.parser import ParsedArgs
 
 
 class ConfigCommandGroup(BaseCommand):
     """Configuration management command group."""
-    
+
     @property
     def name(self) -> str:
         return "config"
-    
+
     @property
     def description(self) -> str:
         return "Configuration management"
-    
+
     def execute(self, args: ParsedArgs) -> int:
         """Route to subcommand."""
         subcommand = args.subcommand
-        
+
         if subcommand == "list-endpoints":
             return ConfigListEndpointsCommand().execute(args)
         elif subcommand == "show":
@@ -29,25 +30,25 @@ class ConfigCommandGroup(BaseCommand):
             return ConfigExampleCommand().execute(args)
         else:
             print(f"Error: Unknown subcommand '{subcommand}'", file=sys.stderr)
-            print(f"Available subcommands: list-endpoints, show, docs, example", file=sys.stderr)
+            print("Available subcommands: list-endpoints, show, docs, example", file=sys.stderr)
             return 1
 
 
 class ConfigListEndpointsCommand(BaseCommand):
     """wolo config list-endpoints"""
-    
+
     @property
     def name(self) -> str:
         return "config list-endpoints"
-    
+
     @property
     def description(self) -> str:
         return "List configured endpoints"
-    
+
     def execute(self, args: ParsedArgs) -> int:
         """Execute list-endpoints command."""
-        from wolo.config import Config, EndpointConfig
-        
+        from wolo.config import Config
+
         endpoints = Config._get_endpoints()
         if not endpoints:
             print("No endpoints configured in ~/.wolo/config.yaml")
@@ -71,27 +72,28 @@ class ConfigListEndpointsCommand(BaseCommand):
 
 class ConfigShowCommand(BaseCommand):
     """wolo config show"""
-    
+
     @property
     def name(self) -> str:
         return "config show"
-    
+
     @property
     def description(self) -> str:
         return "Show current configuration"
-    
+
     def execute(self, args: ParsedArgs) -> int:
         """Execute show command."""
-        from wolo.config import Config
         import yaml
-        
+
+        from wolo.config import Config
+
         try:
             config_data = Config._load_config_file()
             if not config_data:
                 print("No configuration file found at ~/.wolo/config.yaml")
                 print("Use 'wolo config example' to see an example configuration.")
                 return 0
-            
+
             print("Current configuration:")
             print()
             print(yaml.dump(config_data, default_flow_style=False, sort_keys=False))
@@ -103,24 +105,24 @@ class ConfigShowCommand(BaseCommand):
 
 class ConfigExampleCommand(BaseCommand):
     """wolo config example"""
-    
+
     @property
     def name(self) -> str:
         return "config example"
-    
+
     @property
     def description(self) -> str:
         return "Show example configuration file"
-    
+
     def execute(self, args: ParsedArgs) -> int:
         """Execute example command."""
         example_path = Path(__file__).parent.parent.parent.parent / "config.example.yaml"
-        
+
         if not example_path.exists():
             print(f"Error: Example config file not found at {example_path}", file=sys.stderr)
             return 1
-        
-        print(f"Example configuration file (save to ~/.wolo/config.yaml):")
+
+        print("Example configuration file (save to ~/.wolo/config.yaml):")
         print()
         print(example_path.read_text())
         return 0
@@ -128,23 +130,23 @@ class ConfigExampleCommand(BaseCommand):
 
 class ConfigDocsCommand(BaseCommand):
     """wolo config docs"""
-    
+
     @property
     def name(self) -> str:
         return "config docs"
-    
+
     @property
     def description(self) -> str:
         return "Show configuration documentation"
-    
+
     def execute(self, args: ParsedArgs) -> int:
         """Execute docs command."""
         docs_path = Path(__file__).parent.parent.parent.parent / "docs" / "CONFIGURATION.md"
-        
+
         if not docs_path.exists():
             print(f"Error: Configuration docs not found at {docs_path}", file=sys.stderr)
             print("See https://github.com/your-repo/wolo/docs/CONFIGURATION.md", file=sys.stderr)
             return 1
-        
+
         print(docs_path.read_text())
         return 0

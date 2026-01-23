@@ -8,20 +8,22 @@ import sys
 def setup_logging(log_level: str = None) -> None:
     """
     Setup logging with configurable level.
-    
+
     Priority: argument > WOLO_LOG_LEVEL env var > default (WARNING)
     """
     # Determine log level: argument > env var > default
     if log_level is None:
         log_level = os.environ.get("WOLO_LOG_LEVEL", "WARNING")
-    
+
     # Parse log level
     level = getattr(logging, log_level.upper(), logging.WARNING)
 
     # File handler - always DEBUG level for file
     file_handler = logging.FileHandler("wolo.log", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
 
     # Console handler - configurable level
     console_handler = logging.StreamHandler(sys.stderr)

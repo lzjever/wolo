@@ -1,24 +1,22 @@
 """Test suite for Wolo."""
 
-import pytest
-import asyncio
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from wolo.session import (
-    create_session,
-    add_user_message,
-    add_assistant_message,
-    get_session_messages,
-    find_last_user_message,
-    find_last_assistant_message,
-    has_pending_tool_calls,
-    get_pending_tool_calls,
-    create_subsession,
-    search_sessions,
-    Message,
     TextPart,
     ToolPart,
+    add_assistant_message,
+    add_user_message,
+    create_session,
+    create_subsession,
+    find_last_assistant_message,
+    find_last_user_message,
+    get_pending_tool_calls,
+    get_session_messages,
+    has_pending_tool_calls,
 )
 
 
@@ -149,7 +147,7 @@ class TestSessionPersistence:
     def test_save_and_load_session(self):
         """Test saving and loading a session."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from wolo.session import get_sessions_dir, save_session, load_session
+            from wolo.session import load_session, save_session
 
             # Override sessions directory
             original_sessions = Path(tmpdir)
@@ -162,6 +160,7 @@ class TestSessionPersistence:
 
             # Clear in-memory session
             from wolo.session import _sessions
+
             if session_id in _sessions:
                 del _sessions[session_id]
 

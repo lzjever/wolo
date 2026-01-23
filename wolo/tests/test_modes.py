@@ -1,6 +1,5 @@
 """Tests for execution modes."""
 
-import pytest
 from wolo.modes import ExecutionMode, ModeConfig, QuotaConfig
 
 
@@ -50,7 +49,7 @@ def test_quota_config():
     assert quota.max_steps == 50
     assert quota.max_tokens is None
     assert quota.max_time_seconds is None
-    
+
     # Test quota check
     assert quota.check_quota_exceeded(49) is False
     assert quota.check_quota_exceeded(50) is True
@@ -68,18 +67,18 @@ def test_quota_config_default():
 def test_tool_filtering():
     """Test that tools can be filtered."""
     from wolo.tools import get_all_tools
-    
+
     # Get all tools
     all_tools = get_all_tools()
     tool_names = {t["function"]["name"] for t in all_tools}
-    
+
     # Verify question tool exists
     assert "question" in tool_names
-    
+
     # Get tools excluding question
     filtered_tools = get_all_tools(excluded_tools={"question"})
     filtered_names = {t["function"]["name"] for t in filtered_tools}
-    
+
     # Verify question tool is excluded
     assert "question" not in filtered_names
     # Verify other tools still exist

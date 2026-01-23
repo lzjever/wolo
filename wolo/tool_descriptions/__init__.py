@@ -12,10 +12,10 @@ _DESCRIPTIONS_DIR = Path(__file__).parent
 def load_tool_description(tool_name: str) -> str:
     """
     Load tool description from .txt file.
-    
+
     Args:
         tool_name: Name of the tool (e.g., "shell", "read")
-        
+
     Returns:
         Tool description string, or a fallback if file not found
     """

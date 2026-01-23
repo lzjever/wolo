@@ -1,0 +1,95 @@
+# Build, create GitHub Release, and publish mbos-wolo to PyPI.
+# Trigger: push tag v* (e.g. v0.1.0) or workflow_dispatch.
+# Required: Add secret PYPI_API_TOKEN (PyPI API token) in repo Settings > Secrets.
+
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g., v0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Verify version matches package
+        run: |
+          PACKAGE_VERSION=$(python -c "import re; f=open('pyproject.toml'); c=f.read(); f.close(); m=re.search(r'^version\s*=\s*[\"']([^\"']+)[\"']', c, re.M); print(m.group(1) if m else '')")
+          EXPECTED="${{ steps.get_version.outputs.version }}"
+          if [ -z "$PACKAGE_VERSION" ]; then
+            echo "Error: Could not read version from pyproject.toml"
+            exit 1
+          fi
+          if [ "$PACKAGE_VERSION" != "$EXPECTED" ]; then
+            echo "Error: pyproject.toml version ($PACKAGE_VERSION) != tag ($EXPECTED)"
+            exit 1
+          fi
+          echo "Version OK: $PACKAGE_VERSION"
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Release ${{ steps.get_version.outputs.tag }}
+          body: |
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.tag }}/CHANGELOG.md) for details.
+          files: dist/*
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "PYPI_API_TOKEN not set, skipping PyPI upload"
+            exit 0
+          fi
+          echo "Publishing mbos-wolo to PyPI..."
+          twine upload dist/*

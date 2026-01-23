@@ -1,14 +1,12 @@
 """截断系统测试"""
+
 import os
 import time
 from pathlib import Path
 
-import pytest
-
 from wolo.truncate import (
     MAX_BYTES,
     MAX_LINES,
-    OUTPUT_DIR,
     TruncateResult,
     cleanup_old_outputs,
     init,

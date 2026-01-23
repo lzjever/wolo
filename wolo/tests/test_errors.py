@@ -1,13 +1,13 @@
 """Test suite for error handling."""
 
 import pytest
-import asyncio
+
 from wolo.errors import (
     ErrorCategory,
-    classify_api_error,
-    get_retry_strategy,
-    format_user_friendly_error,
     WoloAPIError,
+    classify_api_error,
+    format_user_friendly_error,
+    get_retry_strategy,
 )
 
 
@@ -47,11 +47,7 @@ class TestErrorClassification:
 
     def test_classify_network_error(self):
         """Test classification of network errors."""
-        error_info = classify_api_error(
-            0,
-            "Connection timeout",
-            asyncio.TimeoutError("Timeout")
-        )
+        error_info = classify_api_error(0, "Connection timeout", TimeoutError("Timeout"))
         assert error_info.category == ErrorCategory.RETRYABLE
         assert error_info.retryable is True
 

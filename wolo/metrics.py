@@ -1,19 +1,20 @@
 """Metrics collection for benchmarking Wolo agent performance."""
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List
-import json
+from typing import Any
 
 
 @dataclass
 class StepMetrics:
     """Metrics collected during a single agent loop step."""
+
     step_number: int
     llm_latency_ms: float
     prompt_tokens: int
     completion_tokens: int
-    tool_calls: List[Dict[str, Any]]
+    tool_calls: list[dict[str, Any]]
     tool_duration_ms: float
 
     def to_dict(self) -> dict[str, Any]:
@@ -33,6 +34,7 @@ class StepMetrics:
 @dataclass
 class SessionMetrics:
     """Metrics collected during an agent session."""
+
     session_id: str
     agent_type: str
     start_time: datetime
@@ -43,11 +45,11 @@ class SessionMetrics:
     total_completion_tokens: int = 0
     tool_calls: int = 0
     tool_errors: int = 0
-    tools_by_name: Dict[str, int] = field(default_factory=dict)
-    errors_by_category: Dict[str, int] = field(default_factory=dict)
+    tools_by_name: dict[str, int] = field(default_factory=dict)
+    errors_by_category: dict[str, int] = field(default_factory=dict)
     finish_reason: str = ""
-    subagent_sessions: List[str] = field(default_factory=list)
-    steps: List[StepMetrics] = field(default_factory=list)
+    subagent_sessions: list[str] = field(default_factory=list)
+    steps: list[StepMetrics] = field(default_factory=list)
 
     @property
     def total_duration_ms(self) -> float:
@@ -131,7 +133,7 @@ class MetricsCollector:
     """Singleton collector for session metrics."""
 
     _instance: "MetricsCollector | None" = None
-    _sessions: Dict[str, SessionMetrics] = {}
+    _sessions: dict[str, SessionMetrics] = {}
 
     def __new__(cls) -> "MetricsCollector":
         if cls._instance is None:
@@ -141,9 +143,7 @@ class MetricsCollector:
     def create_session(self, session_id: str, agent_type: str) -> SessionMetrics:
         """Create a new metrics session."""
         metrics = SessionMetrics(
-            session_id=session_id,
-            agent_type=agent_type,
-            start_time=datetime.now()
+            session_id=session_id, agent_type=agent_type, start_time=datetime.now()
         )
         self._sessions[session_id] = metrics
         return metrics
@@ -165,7 +165,7 @@ class MetricsCollector:
             return metrics.to_dict()
         return None
 
-    def export_all(self) -> List[dict[str, Any]]:
+    def export_all(self) -> list[dict[str, Any]]:
         """Export all session metrics as a list of dictionaries."""
         return [m.to_dict() for m in self._sessions.values()]
 
@@ -179,7 +179,7 @@ class MetricsCollector:
             json.dump(self.export_all(), f, indent=2, default=str)
 
 
-def generate_report(results: List[dict[str, Any]]) -> str:
+def generate_report(results: list[dict[str, Any]]) -> str:
     """
     Generate a formatted benchmark report from metrics results.
 
@@ -204,10 +204,10 @@ def generate_report(results: List[dict[str, Any]]) -> str:
     report_lines.append("-" * 80)
 
     for r in results:
-        name = r.get('name', r.get('session_id', 'unknown')[:25])
-        steps = r.get('total_steps', 0)
-        tokens = r.get('total_tokens', 0)
-        tools = r.get('tool_calls', 0)
+        name = r.get("name", r.get("session_id", "unknown")[:25])
+        steps = r.get("total_steps", 0)
+        tokens = r.get("total_tokens", 0)
+        tools = r.get("tool_calls", 0)
         duration = f"{r.get('total_duration_ms', 0):.0f}ms"
         report_lines.append(f"{name:<25} {steps:<8} {tokens:<10} {tools:<8} {duration:<12}")
 
@@ -216,7 +216,7 @@ def generate_report(results: List[dict[str, Any]]) -> str:
     report_lines.append("-" * 80)
 
     for r in results:
-        name = r.get('name', r.get('session_id', 'unknown'))
+        name = r.get("name", r.get("session_id", "unknown"))
         report_lines.append(f"\n{name}:")
         report_lines.append(f"  Agent: {r.get('agent_type', 'unknown')}")
         report_lines.append(f"  Finish Reason: {r.get('finish_reason', 'unknown')}")
@@ -230,11 +230,11 @@ def generate_report(results: List[dict[str, Any]]) -> str:
         report_lines.append(f"  Tool Errors: {r.get('tool_errors', 0)}")
         report_lines.append(f"  Subagent Sessions: {r.get('subagent_count', 0)}")
 
-        tools_by_name = r.get('tools_by_name', {})
+        tools_by_name = r.get("tools_by_name", {})
         if tools_by_name:
             report_lines.append(f"  Tools Used: {tools_by_name}")
 
-        errors_by_category = r.get('errors_by_category', {})
+        errors_by_category = r.get("errors_by_category", {})
         if errors_by_category:
             report_lines.append(f"  Errors by Category: {errors_by_category}")
 

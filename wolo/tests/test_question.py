@@ -1,17 +1,16 @@
 """Question tool tests."""
+
 import asyncio
 
 import pytest
 
 from wolo.question import (
-    Answer,
-    QuestionCancelled,
+    QuestionCancelledError,
     QuestionInfo,
     QuestionOption,
-    QuestionTimeout,
+    QuestionTimeoutError,
     ask_questions,
     cancel_question,
-    get_pending_question,
     has_pending_questions,
     submit_answers,
 )
@@ -56,7 +55,7 @@ class TestAskQuestions:
     @pytest.mark.asyncio
     async def test_question_timeout(self):
         """Question times out if not answered."""
-        with pytest.raises(QuestionTimeout):
+        with pytest.raises(QuestionTimeoutError):
             await ask_questions(
                 "test_session",
                 [QuestionInfo(question="Test?")],
@@ -66,6 +65,7 @@ class TestAskQuestions:
     @pytest.mark.asyncio
     async def test_submit_answers(self):
         """Answers can be submitted."""
+
         # Start question in background
         async def ask():
             return await ask_questions(
@@ -92,6 +92,7 @@ class TestAskQuestions:
     @pytest.mark.asyncio
     async def test_cancel_question(self):
         """Question can be cancelled."""
+
         async def ask():
             return await ask_questions(
                 "test_session_cancel",
@@ -108,7 +109,7 @@ class TestAskQuestions:
                 cancel_question(qid)
                 break
 
-        with pytest.raises(QuestionCancelled):
+        with pytest.raises(QuestionCancelledError):
             await task
 
 
@@ -142,4 +143,5 @@ class TestHasPendingQuestions:
 def get_pending_questions_ids():
     """Get all pending question IDs."""
     from wolo.question import _pending_questions
+
     return list(_pending_questions.keys())

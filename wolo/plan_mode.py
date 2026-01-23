@@ -4,23 +4,24 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class PlanStage(str, Enum):
     """Plan workflow stages."""
-    UNDERSTAND = "understand"      # Understand requirements
-    DESIGN = "design"              # Design approach
-    REVIEW = "review"              # Review with user
-    FINAL_PLAN = "final_plan"      # Create final plan
-    EXIT = "exit"                  # Exit plan mode
+
+    UNDERSTAND = "understand"  # Understand requirements
+    DESIGN = "design"  # Design approach
+    REVIEW = "review"  # Review with user
+    FINAL_PLAN = "final_plan"  # Create final plan
+    EXIT = "exit"  # Exit plan mode
 
 
 @dataclass
 class PlanState:
     """State for plan mode workflow."""
+
     stage: PlanStage = PlanStage.UNDERSTAND
     plan_file: Path | None = None
     user_goal: str = ""
@@ -76,7 +77,6 @@ Remember: You are in READ-ONLY mode for planning. Use read, grep, glob to explor
 3. Summarize your understanding
 
 When ready, output: "STAGE_COMPLETE: I understand the requirements." """,
-
         PlanStage.DESIGN: """**Design Stage**: Design the implementation approach.
 
 1. Identify key files that need modification
@@ -85,7 +85,6 @@ When ready, output: "STAGE_COMPLETE: I understand the requirements." """,
 4. Estimate complexity
 
 When ready, output: "STAGE_COMPLETE: Design is ready for review." """,
-
         PlanStage.REVIEW: """**Review Stage**: Review the plan with the user.
 
 1. Present the design clearly
@@ -94,7 +93,6 @@ When ready, output: "STAGE_COMPLETE: Design is ready for review." """,
 4. Wait for user approval
 
 When approved, output: "STAGE_COMPLETE: Plan approved." """,
-
         PlanStage.FINAL_PLAN: """**Final Plan Stage**: Create the final implementation plan.
 
 1. Create a detailed, step-by-step plan
@@ -103,7 +101,6 @@ When approved, output: "STAGE_COMPLETE: Plan approved." """,
 4. Save the plan to a file
 
 Output: "STAGE_COMPLETE: Final plan created." """,
-
         PlanStage.EXIT: """**Exit Stage**: Planning complete.
 
 The user can now use the general agent to implement the plan.
@@ -113,7 +110,9 @@ Provide a summary of what was planned.""",
     return base_prompt.format(
         stage=stage.value.upper(),
         stage_instructions=stage_instructions.get(stage, ""),
-        task=f"Current goal: {state.user_goal}" if state.user_goal else "Help the user plan their changes."
+        task=f"Current goal: {state.user_goal}"
+        if state.user_goal
+        else "Help the user plan their changes.",
     )
 
 

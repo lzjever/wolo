@@ -1,4 +1,5 @@
 import pytest
+
 from wolo.cli.commands.base import BaseCommand
 
 

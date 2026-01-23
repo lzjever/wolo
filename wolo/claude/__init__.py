@@ -9,8 +9,8 @@ allowing Wolo to read and use:
 """
 
 from .config import ClaudeConfig, load_claude_config
-from .skill_loader import ClaudeSkill, load_claude_skills, load_all_skills
 from .mcp_config import load_claude_mcp_servers
+from .skill_loader import ClaudeSkill, load_all_skills, load_claude_skills
 
 __all__ = [
     "ClaudeConfig",

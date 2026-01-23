@@ -4,7 +4,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ class WoloAPIError(Exception):
 
 class ErrorCategory(str, Enum):
     """Categories of errors that can occur."""
+
     RETRYABLE = "retryable"  # Network timeout, rate limit - should retry
     AUTH = "auth"  # Authentication failure - don't retry
     INVALID_REQUEST = "invalid_request"  # Bad input - don't retry
@@ -32,6 +32,7 @@ class ErrorCategory(str, Enum):
 @dataclass
 class ErrorInfo:
     """Structured error information."""
+
     category: ErrorCategory
     retryable: bool
     user_message: str
@@ -40,7 +41,9 @@ class ErrorInfo:
     status_code: int | None = None
 
 
-def classify_api_error(status_code: int, error_text: str, exception: Exception | None = None) -> ErrorInfo:
+def classify_api_error(
+    status_code: int, error_text: str, exception: Exception | None = None
+) -> ErrorInfo:
     """
     Classify an API error into categories and provide user-friendly messages.
 
@@ -64,9 +67,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             suggestions=[
                 "Verify GLM_API_KEY is set correctly",
                 "Check if your API key has expired",
-                "Ensure your account has API access enabled"
+                "Ensure your account has API access enabled",
             ],
-            status_code=status_code
+            status_code=status_code,
         )
 
     # Rate limiting (429)
@@ -79,9 +82,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             suggestions=[
                 "Wait a few seconds before trying again",
                 "Reduce the frequency of requests",
-                "Consider upgrading your API plan"
+                "Consider upgrading your API plan",
             ],
-            status_code=status_code
+            status_code=status_code,
         )
 
     # Not found (404)
@@ -93,9 +96,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             technical_details=f"HTTP {status_code}: {error_text}",
             suggestions=[
                 "Check if the API endpoint URL is correct",
-                "Verify the model name is supported"
+                "Verify the model name is supported",
             ],
-            status_code=status_code
+            status_code=status_code,
         )
 
     # Client errors (400, 422)
@@ -108,9 +111,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             suggestions=[
                 "Check if the model name is correct",
                 "Verify your message format is valid",
-                "Check if you're exceeding token limits"
+                "Check if you're exceeding token limits",
             ],
-            status_code=status_code
+            status_code=status_code,
         )
 
     # Server errors (500, 502, 503, 504)
@@ -123,9 +126,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             suggestions=[
                 "Wait a moment and try again",
                 "Check if the GLM service status page",
-                "Try again later if the problem persists"
+                "Try again later if the problem persists",
             ],
-            status_code=status_code
+            status_code=status_code,
         )
 
     # Network/connection errors
@@ -139,9 +142,9 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
             suggestions=[
                 "Check your internet connection",
                 "Verify you can access open.bigmodel.cn",
-                "Try again in a moment"
+                "Try again in a moment",
             ],
-            status_code=None
+            status_code=None,
         )
 
     # Unknown error
@@ -153,13 +156,15 @@ def classify_api_error(status_code: int, error_text: str, exception: Exception |
         suggestions=[
             "Check wolo.log for more details",
             "Try again with a simpler request",
-            "Report this issue if it persists"
+            "Report this issue if it persists",
         ],
-        status_code=status_code
+        status_code=status_code,
     )
 
 
-def get_retry_strategy(category: ErrorCategory, attempt: int, max_attempts: int) -> tuple[bool, float]:
+def get_retry_strategy(
+    category: ErrorCategory, attempt: int, max_attempts: int
+) -> tuple[bool, float]:
     """
     Determine if an error is retryable and calculate delay.
 
@@ -171,8 +176,11 @@ def get_retry_strategy(category: ErrorCategory, attempt: int, max_attempts: int)
     Returns:
         Tuple of (should_retry, delay_ms)
     """
-    if not category.value in (ErrorCategory.RETRYABLE.value, ErrorCategory.RATE_LIMIT.value,
-                              ErrorCategory.SERVER.value):
+    if category.value not in (
+        ErrorCategory.RETRYABLE.value,
+        ErrorCategory.RATE_LIMIT.value,
+        ErrorCategory.SERVER.value,
+    ):
         return False, 0
 
     if attempt >= max_attempts:
@@ -199,10 +207,7 @@ def get_retry_strategy(category: ErrorCategory, attempt: int, max_attempts: int)
 
 def format_user_friendly_error(error_info: ErrorInfo) -> str:
     """Format error info as user-friendly message."""
-    lines = [
-        f"\n❌ Error: {error_info.user_message}",
-        f"\nDetails: {error_info.technical_details}"
-    ]
+    lines = [f"\n❌ Error: {error_info.user_message}", f"\nDetails: {error_info.technical_details}"]
 
     if error_info.suggestions:
         lines.append("\nSuggestions:")

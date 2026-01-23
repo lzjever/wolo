@@ -6,12 +6,18 @@ import logging
 import os
 import platform
 import time
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import aiohttp
 
 from wolo.config import Config
-from wolo.errors import classify_api_error, get_retry_strategy, format_user_friendly_error, WoloAPIError
+from wolo.errors import (
+    WoloAPIError,
+    classify_api_error,
+    format_user_friendly_error,
+    get_retry_strategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +32,7 @@ RETRY_DELAY_MS = 1000  # Base delay in milliseconds
 _last_error_info = None
 
 # Token usage from API response
-_api_token_usage = {
-    "prompt_tokens": 0,
-    "completion_tokens": 0,
-    "total_tokens": 0
-}
+_api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 # Fallback system prompt (only used if no agent_config provided)
 FALLBACK_SYSTEM_PROMPT = """You are Wolo, an AI coding agent that helps users with software engineering tasks.
@@ -56,15 +58,21 @@ Remember: The user wants you to ACT, not talk. Use tools! Complete ALL tasks!
 class GLMClient:
     """
     GLM API client with connection pooling.
-    
+
     Reuses HTTP connections across requests for better performance.
     """
-    
+
     # Class-level session pool for connection reuse across instances
     _session_pool: dict[str, aiohttp.ClientSession] = {}
     _session_lock = asyncio.Lock()
-    
-    def __init__(self, config: Config, agent_config: Any = None, session_id: str | None = None, agent_display_name: str | None = None) -> None:
+
+    def __init__(
+        self,
+        config: Config,
+        agent_config: Any = None,
+        session_id: str | None = None,
+        agent_display_name: str | None = None,
+    ) -> None:
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model = config.model
@@ -74,19 +82,21 @@ class GLMClient:
         self._finish_reason = None  # Track the actual finish reason
         self._agent_config = agent_config  # Store for system prompt
         self._session_id = session_id or "unknown"  # Track session for opencode-style headers
-        self._agent_display_name = agent_display_name  # Agent display name (replaces "Wolo" in prompts)
+        self._agent_display_name = (
+            agent_display_name  # Agent display name (replaces "Wolo" in prompts)
+        )
         self._project_id = os.path.basename(os.getcwd())  # Use current directory as project ID
         self._debug_llm_file = config.debug_llm_file  # Debug file for LLM requests/responses
         self._debug_full_dir = config.debug_full_dir  # Directory for full request/response logs
         self._request_count = 0  # Track request count for debug file naming
-        
+
         # Connection pool key based on base_url
         self._pool_key = self.base_url
-    
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """
         Get or create a shared aiohttp session for connection reuse.
-        
+
         Sessions are pooled by base_url to allow connection reuse
         while supporting multiple API endpoints.
         """
@@ -109,9 +119,9 @@ class GLMClient:
                     timeout=timeout,
                 )
                 logger.debug(f"Created new HTTP session for {self._pool_key}")
-            
+
             return GLMClient._session_pool[self._pool_key]
-    
+
     @classmethod
     async def close_all_sessions(cls):
         """Close all pooled sessions. Call on application shutdown."""
@@ -126,7 +136,7 @@ class GLMClient:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncIterator[dict[str, Any]]:
         """
         Call GLM API with streaming support and retry logic.
@@ -148,24 +158,18 @@ class GLMClient:
                 _last_error_info = None  # Clear error on success
                 return  # Success - exit retry loop
 
-            except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError, WoloAPIError) as e:
+            except (TimeoutError, aiohttp.ClientError, RuntimeError, WoloAPIError) as e:
                 # Classify the error
-                status_code = getattr(e, 'status', None)
-                if hasattr(e, 'response') and hasattr(e.response, 'status'):
+                status_code = getattr(e, "status", None)
+                if hasattr(e, "response") and hasattr(e.response, "status"):
                     status_code = e.response.status
 
                 error_text = str(e)
-                _last_error_info = classify_api_error(
-                    status_code or 0,
-                    error_text,
-                    e
-                )
+                _last_error_info = classify_api_error(status_code or 0, error_text, e)
 
                 # Check if we should retry
                 should_retry, delay = get_retry_strategy(
-                    _last_error_info.category,
-                    attempt + 1,
-                    MAX_RETRIES
+                    _last_error_info.category, attempt + 1, MAX_RETRIES
                 )
 
                 if not should_retry or attempt >= MAX_RETRIES - 1:
@@ -174,7 +178,7 @@ class GLMClient:
                     logger.error(f"API call failed after {attempt + 1} attempts: {error_text}")
                     raise RuntimeError(user_message) from e
 
-                delay = delay or RETRY_DELAY_MS * (2 ** attempt)
+                delay = delay or RETRY_DELAY_MS * (2**attempt)
                 logger.warning(
                     f"API call failed (attempt {attempt + 1}/{MAX_RETRIES}): {_last_error_info.user_message}. "
                     f"Retrying in {delay}ms..."
@@ -185,7 +189,7 @@ class GLMClient:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncIterator[dict[str, Any]]:
         """Single attempt at calling GLM API with opencode-style headers."""
         url = f"{self.base_url}/chat/completions"
@@ -209,19 +213,20 @@ class GLMClient:
                 system_prompt = self._agent_config.system_prompt
             else:
                 system_prompt = FALLBACK_SYSTEM_PROMPT
-            
+
             # Replace "Wolo" with agent_display_name if provided
             # Use word boundaries to avoid replacing "Wolo" in the middle of other words
             if self._agent_display_name:
                 import re
+
                 # Replace "Wolo" (case-sensitive) with agent_display_name
-                system_prompt = re.sub(r'\bWolo\b', self._agent_display_name, system_prompt)
+                system_prompt = re.sub(r"\bWolo\b", self._agent_display_name, system_prompt)
                 # Replace "wolo" (lowercase) with lowercase agent_display_name
-                system_prompt = re.sub(r'\bwolo\b', self._agent_display_name.lower(), system_prompt)
-            
+                system_prompt = re.sub(r"\bwolo\b", self._agent_display_name.lower(), system_prompt)
+
             # Note: Skills are now loaded on-demand via the skill tool
             # instead of being auto-injected into the system prompt
-            
+
             messages = [{"role": "system", "content": system_prompt}] + messages
 
         # Messages are already formatted by to_llm_messages() for OpenAI-compatible APIs
@@ -237,10 +242,7 @@ class GLMClient:
                 if isinstance(content, list):
                     text_parts = [p.get("text", "") for p in content if p.get("type") == "text"]
                     content = "\n".join(text_parts)
-                formatted_messages.append({
-                    "role": msg.get("role", "user"),
-                    "content": content
-                })
+                formatted_messages.append({"role": msg.get("role", "user"), "content": content})
 
         payload = {
             "model": self.model,
@@ -250,7 +252,7 @@ class GLMClient:
             "max_tokens": self.max_tokens,
             # opencode-style additional parameters
             "topP": 0.9,  # Default topP matching opencode
-            "topK": 40,   # Default topK matching opencode
+            "topK": 40,  # Default topK matching opencode
             "maxOutputTokens": self.max_tokens,  # opencode uses maxOutputTokens
             "maxRetries": MAX_RETRIES,  # opencode includes maxRetries
         }
@@ -262,7 +264,7 @@ class GLMClient:
         if self.enable_think:
             payload["thinking"] = {
                 "type": "enabled",
-                "clear_thinking": False  # False for Preserved Thinking
+                "clear_thinking": False,  # False for Preserved Thinking
             }
             logger.debug("GLM thinking mode enabled")
 
@@ -277,15 +279,24 @@ class GLMClient:
         if self._debug_full_dir:
             try:
                 import os
+
                 timestamp = time.strftime("%Y%m%d_%H%M%S")
                 full_debug_file = os.path.join(self._debug_full_dir, f"req_{timestamp}.json")
                 with open(full_debug_file, "w") as f:
                     f.write("---INPUT---\n")
-                    f.write(json.dumps({
-                        "url": url,
-                        "headers": {k: v for k, v in headers.items() if k != "Authorization"},
-                        "payload": payload
-                    }, indent=2, ensure_ascii=False))
+                    f.write(
+                        json.dumps(
+                            {
+                                "url": url,
+                                "headers": {
+                                    k: v for k, v in headers.items() if k != "Authorization"
+                                },
+                                "payload": payload,
+                            },
+                            indent=2,
+                            ensure_ascii=False,
+                        )
+                    )
                     f.write("\n---OUTPUT---\n")
                     f.flush()
                 logger.debug(f"Full debug log: {full_debug_file}")
@@ -295,16 +306,18 @@ class GLMClient:
         if self._debug_llm_file:
             try:
                 with open(self._debug_llm_file, "a") as f:
-                    f.write(f"\n{'='*60}\n")
+                    f.write(f"\n{'=' * 60}\n")
                     f.write(f"[{time.strftime('%H:%M:%S')}] Request #{self._request_count}\n")
                     f.write(f"Model: {self.model}\n")
                     # Show last user message for context
                     for msg in reversed(formatted_messages):
                         if msg.get("role") == "user":
                             content = msg.get("content", "")[:100]
-                            f.write(f"User: {content}{'...' if len(msg.get('content', '')) > 100 else ''}\n")
+                            f.write(
+                                f"User: {content}{'...' if len(msg.get('content', '')) > 100 else ''}\n"
+                            )
                             break
-                    f.write(f"{'='*60}\n")
+                    f.write(f"{'=' * 60}\n")
                     f.flush()
                 logger.debug(f"Debug log opened: {self._debug_llm_file}")
             except Exception as e:
@@ -315,7 +328,9 @@ class GLMClient:
             if response.status != 200:
                 error_text = await response.text()
                 logger.error(f"GLM API error: {response.status} - {error_text}")
-                raise WoloAPIError(f"GLM API error: {response.status} - {error_text}", response.status)
+                raise WoloAPIError(
+                    f"GLM API error: {response.status} - {error_text}", response.status
+                )
 
             # Handle streaming response
             buffer = ""
@@ -349,7 +364,9 @@ class GLMClient:
                         if self._debug_llm_file:
                             try:
                                 with open(self._debug_llm_file, "a") as f:
-                                    f.write(f"\n(finish_reason: {self._finish_reason or 'unknown'})\n")
+                                    f.write(
+                                        f"\n(finish_reason: {self._finish_reason or 'unknown'})\n"
+                                    )
                                     f.flush()
                             except Exception:
                                 pass
@@ -389,16 +406,28 @@ class GLMClient:
                                                 self._debug_tool_calls = {}
 
                                             if name:
-                                                self._debug_tool_calls[index] = {"name": name, "args_shown": 0}
+                                                self._debug_tool_calls[index] = {
+                                                    "name": name,
+                                                    "args_shown": 0,
+                                                }
                                                 with open(self._debug_llm_file, "a") as f:
                                                     f.write(f"\n[Calling: {name}]\n")
                                                     f.flush()
 
                                             if index in self._debug_tool_calls and args:
                                                 # Stream the raw arguments JSON as-is
-                                                total_args = self._debug_tool_calls[index].get("total_args", "") + args
-                                                self._debug_tool_calls[index]["total_args"] = total_args
-                                                self._debug_tool_calls[index]["args_shown"] = len(total_args)
+                                                total_args = (
+                                                    self._debug_tool_calls[index].get(
+                                                        "total_args", ""
+                                                    )
+                                                    + args
+                                                )
+                                                self._debug_tool_calls[index]["total_args"] = (
+                                                    total_args
+                                                )
+                                                self._debug_tool_calls[index]["args_shown"] = len(
+                                                    total_args
+                                                )
 
                                                 # Show newly added portion
                                                 if args:
@@ -435,15 +464,14 @@ class GLMClient:
             if full_debug_file:
                 try:
                     with open(full_debug_file, "a") as f:
-                        f.write(f"\n---END--- (finish_reason: {self._finish_reason or 'unknown'})\n")
+                        f.write(
+                            f"\n---END--- (finish_reason: {self._finish_reason or 'unknown'})\n"
+                        )
                         f.flush()
                 except Exception:
                     pass
 
-    async def _process_sse_data(
-        self,
-        data: dict[str, Any]
-    ) -> AsyncIterator[dict[str, Any]]:
+    async def _process_sse_data(self, data: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Process SSE data and yield events."""
         choices = data.get("choices", [])
         if not choices:
@@ -504,8 +532,15 @@ class GLMClient:
                         # Try to parse arguments - if successful, yield the event
                         if tool_data["arguments"]:
                             parsed_args = json.loads(tool_data["arguments"])
-                            logger.info(f"Tool call complete: {tool_data['name']} with args {list(parsed_args.keys())}")
-                            yield {"type": "tool-call", "tool": tool_data["name"], "input": parsed_args, "id": tool_data.get("id", "")}
+                            logger.info(
+                                f"Tool call complete: {tool_data['name']} with args {list(parsed_args.keys())}"
+                            )
+                            yield {
+                                "type": "tool-call",
+                                "tool": tool_data["name"],
+                                "input": parsed_args,
+                                "id": tool_data.get("id", ""),
+                            }
                             del self._tool_call_buffer[index]
                     except json.JSONDecodeError:
                         # Arguments not complete yet, waiting for more data
@@ -526,8 +561,4 @@ def get_token_usage() -> dict[str, int]:
 def reset_token_usage() -> None:
     """Reset the token usage tracking."""
     global _api_token_usage
-    _api_token_usage = {
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "total_tokens": 0
-    }
+    _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

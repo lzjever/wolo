@@ -1,4 +1,5 @@
 """智能替换测试"""
+
 import pytest
 
 from wolo.smart_replace import (
@@ -294,22 +295,22 @@ class TestSmartReplace:
 
     def test_complex_code_edit(self):
         """复杂代码编辑 - 使用锚定匹配"""
-        content = '''def calculate(x, y):
+        content = """def calculate(x, y):
     # Add two numbers
     result = x + y
-    return result'''
-        
+    return result"""
+
         # 使用首尾行作为锚点的匹配
-        old = '''def calculate(x, y):
+        old = """def calculate(x, y):
     # different comment
     result = x + y
-    return result'''
-        
-        new = '''def calculate(x, y):
+    return result"""
+
+        new = """def calculate(x, y):
     # different comment
     result = x * y
-    return result'''
-        
+    return result"""
+
         result = smart_replace(content, old, new)
         assert "x * y" in result
 

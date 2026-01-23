@@ -1,7 +1,4 @@
 """Tools integration tests for Phase 1 features."""
-import os
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -304,6 +301,7 @@ class TestPdfRead:
     @pytest.mark.asyncio
     async def test_read_pdf_with_text(self, tmp_path):
         """Read PDF extracts text."""
+        pytest.importorskip("fitz")
         import fitz
 
         # Create a simple PDF with text

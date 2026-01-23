@@ -1,7 +1,6 @@
 """Tests for CLI argument parser."""
 
-import pytest
-from wolo.cli.parser import FlexibleArgumentParser, ParsedArgs
+from wolo.cli.parser import FlexibleArgumentParser
 from wolo.modes import ExecutionMode
 
 

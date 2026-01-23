@@ -15,27 +15,16 @@ Usage:
     ```python
     from wolo.compaction import CompactionManager
     from wolo.compaction.config import get_default_config
-    
+
     config = get_default_config()
     manager = CompactionManager(config, llm_config)
-    
+
     decision = manager.should_compact(messages, session_id)
     if decision.should_compact:
         result = await manager.compact(messages, session_id)
     ```
 """
 
-from wolo.compaction.types import (
-    CompactionStatus,
-    PolicyType,
-    TokenStats,
-    MessageRef,
-    CompactionRecord,
-    CompactionContext,
-    PolicyResult,
-    CompactionDecision,
-    CompactionResult,
-)
 from wolo.compaction.config import (
     CompactionConfig,
     SummaryPolicyConfig,
@@ -43,9 +32,20 @@ from wolo.compaction.config import (
     get_default_config,
     load_compaction_config,
 )
-from wolo.compaction.token import TokenEstimator
-from wolo.compaction.manager import CompactionManager
 from wolo.compaction.history import CompactionHistory
+from wolo.compaction.manager import CompactionManager
+from wolo.compaction.token import TokenEstimator
+from wolo.compaction.types import (
+    CompactionContext,
+    CompactionDecision,
+    CompactionRecord,
+    CompactionResult,
+    CompactionStatus,
+    MessageRef,
+    PolicyResult,
+    PolicyType,
+    TokenStats,
+)
 
 __all__ = [
     # Types

@@ -4,7 +4,6 @@ This module provides basic support for connecting to MCP servers
 and exposing their tools to the Wolo agent.
 """
 
-import json
 import logging
 from typing import Any
 
@@ -55,10 +54,7 @@ class MCPClient:
         """
         # TODO: Implement actual tool call
         logger.info(f"MCP: Calling tool {name} with args {list(arguments.keys())}")
-        return {
-            "output": f"MCP tool {name} called (placeholder)",
-            "metadata": {}
-        }
+        return {"output": f"MCP tool {name} called (placeholder)", "metadata": {}}
 
     async def disconnect(self) -> None:
         """Disconnect from the MCP server."""
@@ -84,8 +80,8 @@ def mcp_tool_to_wolo_tool(mcp_tool: dict[str, Any], server_name: str) -> dict[st
         "function": {
             "name": f"mcp_{server_name}_{name}",
             "description": f"[MCP:{server_name}] {description}",
-            "parameters": input_schema
-        }
+            "parameters": input_schema,
+        },
     }
 
 

@@ -5,42 +5,40 @@ This module handles command routing and dispatches to appropriate handlers.
 """
 
 import sys
-from typing import Tuple
 
+from wolo.cli.commands.config import ConfigCommandGroup
+from wolo.cli.commands.debug import DebugCommandGroup
+from wolo.cli.commands.repl import ReplCommand
+from wolo.cli.commands.run import RunCommand
+from wolo.cli.commands.session import SessionCommandGroup
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import (
     FlexibleArgumentParser,
     ParsedArgs,
     validate_option_conflicts,
-    combine_inputs,
 )
-from wolo.cli.commands.run import RunCommand
-from wolo.cli.commands.repl import ReplCommand
-from wolo.cli.commands.session import SessionCommandGroup
-from wolo.cli.commands.config import ConfigCommandGroup
-from wolo.cli.commands.debug import DebugCommandGroup
 
 
 def _check_stdin() -> bool:
     """
     Check if stdin should be checked for input.
-    
+
     Returns True if stdin is a pipe (not a TTY), even if data hasn't arrived yet.
     This allows piped input to work: cmd1 | cmd2
     """
     # If stdin is a TTY (interactive terminal), don't check for pipe input
     if sys.stdin.isatty():
         return False
-    
+
     # If stdin is a pipe (not a TTY), always check it
     # The parser will handle reading (which may block until data arrives)
     return True
 
 
-def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
+def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
     """
     Route command to appropriate handler.
-    
+
     ROUTING PRIORITY (STRICT ORDER - DO NOT MODIFY):
     1. Help: -h, --help (highest priority)
     2. Quick commands: -l, -w
@@ -49,11 +47,11 @@ def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
     5. Deprecated: run (shows warning, still works)
     6. Execution: prompt provided (CLI or stdin)
     7. Default: show brief help (no input)
-    
+
     Args:
         args: Command-line arguments
         has_stdin: Whether stdin has data
-        
+
     Returns:
         (command_type, remaining_args)
     """
@@ -66,20 +64,20 @@ def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
             return ("help", [first])
         if len(args) > 2 and args[2] in ("-h", "--help"):
             return ("help", [first, args[1]])
-    
+
     # 2. Quick commands (check BEFORE stdin and subcommands)
     if args:
         first = args[0]
         # Quick list command
         if first in ("-l", "--list"):
             return ("session_list", args[1:])
-        
+
         # Quick watch command
         if first in ("-w", "--watch"):
             if len(args) < 2:
                 return ("error", ["watch requires session id"])
             return ("session_watch", [args[1]])
-    
+
     # 3. Check for empty args
     if not args:
         if has_stdin:
@@ -87,9 +85,9 @@ def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
             return ("execute", [])
         # No args, no stdin → show brief help
         return ("default_help", [])
-    
+
     first = args[0]
-    
+
     # 4. Subcommands
     if first == "session":
         return ("session", args[1:])
@@ -97,20 +95,23 @@ def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
         return ("config", args[1:])
     if first == "debug":
         return ("debug", args[1:])
-    
+
     # 5. REPL entry: chat and repl are synonyms
     if first in ("chat", "repl"):
         return ("repl", args[1:])
-    
+
     # 6. Deprecated: run command (still works but shows warning)
     if first == "run":
-        print("Warning: The 'run' command is deprecated. Use 'wolo \"prompt\"' directly.", file=sys.stderr)
+        print(
+            "Warning: The 'run' command is deprecated. Use 'wolo \"prompt\"' directly.",
+            file=sys.stderr,
+        )
         return ("execute", args[1:])
-    
+
     # 7. Execution mode: has prompt (args) or stdin
     if has_stdin or args:
         return ("execute", args)
-    
+
     # 8. Default: show brief help
     return ("default_help", [])
 
@@ -118,7 +119,7 @@ def _route_command(args: list[str], has_stdin: bool) -> Tuple[str, list[str]]:
 def _show_brief_help() -> int:
     """
     Show brief help when no input provided.
-    
+
     Returns:
         ExitCode.SUCCESS
     """
@@ -146,33 +147,34 @@ Examples:
 def main() -> int:
     """
     Main CLI entry point.
-    
+
     Returns:
         Exit code (see wolo.cli.exit_codes.ExitCode)
     """
     args = sys.argv[1:]
     has_stdin = _check_stdin()
-    
+
     # Route command
     command_type, remaining_args = _route_command(args, has_stdin)
-    
+
     # Handle errors from routing
     if command_type == "error":
         print(f"Error: {remaining_args[0]}", file=sys.stderr)
         return ExitCode.ERROR
-    
+
     # Handle default help (no input)
     if command_type == "default_help":
         return _show_brief_help()
-    
+
     # Handle help command early (before parsing)
     if command_type == "help":
         from wolo.cli.help import show_help
+
         parsed = ParsedArgs()
         parsed.command_type = "help"
         parsed.positional_args = remaining_args if remaining_args else ["main"]
         return show_help(parsed)
-    
+
     # Handle quick commands that don't need parsing
     if command_type == "session_list":
         # Quick list - don't parse, just execute
@@ -189,12 +191,12 @@ def main() -> int:
             parsed.session_options.watch_id = remaining_args[0]
             parsed.positional_args = [remaining_args[0]]
         return SessionCommandGroup().execute(parsed)
-    
+
     # Parse arguments for other commands
     parser = FlexibleArgumentParser()
     parsed = parser.parse(remaining_args, check_stdin=has_stdin)
     parsed.command_type = command_type
-    
+
     # Validate option conflicts after parsing
     # Build options dict from parsed for conflict check
     options_for_check = {}
@@ -209,12 +211,12 @@ def main() -> int:
         options_for_check["--session"] = True
     if parsed.session_options.resume_id is not None:
         options_for_check["--resume"] = True
-    
+
     is_valid, error_msg = validate_option_conflicts(options_for_check)
     if not is_valid:
         print(error_msg, file=sys.stderr)
         return ExitCode.ERROR
-    
+
     # Extract subcommand for command groups
     if command_type in ("session", "config", "debug") and remaining_args:
         # Set subcommand from remaining_args (before parsing removes it)
@@ -228,12 +230,13 @@ def main() -> int:
         parsed.pipe_input = None
         parsed.cli_prompt = None
         parsed.message_from_stdin = False
-    
+
     # Execute command
     if command_type == "execute":
         return RunCommand().execute(parsed)
     elif command_type == "repl":
         from wolo.modes import ExecutionMode
+
         # Set mode to REPL for chat/repl command
         parsed.execution_options.mode = ExecutionMode.REPL
         return ReplCommand().execute(parsed)
@@ -243,7 +246,7 @@ def main() -> int:
         return ConfigCommandGroup().execute(parsed)
     elif command_type == "debug":
         return DebugCommandGroup().execute(parsed)
-    
+
     # Unknown command type
     print(f"Error: Unknown command type: {command_type}", file=sys.stderr)
     return ExitCode.ERROR

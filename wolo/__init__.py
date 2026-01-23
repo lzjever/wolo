@@ -1,3 +1,3 @@
-"""Wolo - Minimal Python AI Agent Clone."""
+"""Wolo - Minimal Python AI Agent."""
 
 __version__ = "0.1.0"

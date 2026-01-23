@@ -11,43 +11,47 @@ Adding a new tool only requires adding one ToolSpec entry here.
 Tool descriptions are stored in wolo/tools/descriptions/*.txt files.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from wolo.tool_descriptions import load_tool_description
 
-
 # ==================== ANSI Colors ====================
+
 
 class Colors:
     """ANSI color codes for terminal output."""
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
-    DIM = '\033[2m'
-    
+
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+
     # Foreground colors
-    BLACK = '\033[30m'
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    WHITE = '\033[97m'
-    GRAY = '\033[90m'
+    BLACK = "\033[30m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    GRAY = "\033[90m"
 
 
 # ==================== Tool Categories ====================
 
+
 class ToolCategory:
     """Tool categories for grouping and styling."""
-    SHELL = "shell"      # Shell commands
-    FILE_READ = "file_read"   # File reading operations
+
+    SHELL = "shell"  # Shell commands
+    FILE_READ = "file_read"  # File reading operations
     FILE_WRITE = "file_write"  # File writing operations
-    SEARCH = "search"    # Search operations (grep, glob)
-    WEB = "web"          # Web operations
-    AGENT = "agent"      # Sub-agent operations
-    META = "meta"        # Meta operations (todos, etc.)
+    SEARCH = "search"  # Search operations (grep, glob)
+    WEB = "web"  # Web operations
+    AGENT = "agent"  # Sub-agent operations
+    META = "meta"  # Meta operations (todos, etc.)
 
 
 # Category to color mapping
@@ -64,48 +68,51 @@ CATEGORY_COLORS = {
 
 # ==================== Helper Functions ====================
 
+
 def _truncate(text: str, max_len: int = 60) -> str:
     """Truncate text with ellipsis."""
     if not text:
         return ""
-    text = text.replace('\n', ' ').strip()
+    text = text.replace("\n", " ").strip()
     if len(text) <= max_len:
         return text
-    return text[:max_len - 3] + "..."
+    return text[: max_len - 3] + "..."
 
 
 # ==================== Tool Spec ====================
+
 
 @dataclass
 class ToolSpec:
     """
     Complete specification for a tool.
-    
+
     This is the single source of truth for tool metadata.
     """
+
     # Identity
     name: str
     description: str
-    
+
     # LLM schema
     parameters: dict[str, Any]
     required_params: list[str] = field(default_factory=list)
-    
+
     # Display
     category: str = ToolCategory.META
     icon: str = "▶"
-    
+
     # Output handling
     show_output: bool = False  # Whether to show full output in CLI
-    
+
     # Custom formatters (optional)
-    _brief_formatter: Optional[Callable[[dict], str]] = None
-    _result_formatter: Optional[Callable[[str, str], str]] = None
-    
+    _brief_formatter: Callable[[dict], str] | None = None
+    _result_formatter: Callable[[str, str], str] | None = None
+
     def get_color(self) -> str:
         """Get the color for this tool based on category."""
         return CATEGORY_COLORS.get(self.category, Colors.WHITE)
-    
+
     def format_brief(self, params: dict) -> str:
         """Format a brief description of the tool call."""
         if self._brief_formatter:
@@ -114,7 +121,7 @@ class ToolSpec:
             except Exception:
                 pass
         return f"{self.icon} {self.name}"
-    
+
     def format_result(self, output: str, status: str) -> str:
         """Format a brief description of the tool result (WITHOUT status icon)."""
         if self._result_formatter:
@@ -122,12 +129,12 @@ class ToolSpec:
                 return self._result_formatter(output, status)
             except Exception:
                 pass
-        
+
         # Default result formatting (no icon - CLI adds it)
         if status == "error":
             return _truncate(output, 60) if output else "failed"
         return "done"
-    
+
     def to_llm_schema(self) -> dict:
         """Convert to LLM function schema format."""
         return {
@@ -139,43 +146,45 @@ class ToolSpec:
                     "type": "object",
                     "properties": self.parameters,
                     "required": self.required_params,
-                }
-            }
+                },
+            },
         }
 
 
 # ==================== Tool Definitions ====================
 
+
 # Shell tool
 def _shell_brief(p: dict) -> str:
-    cmd = p.get('command', '')
-    timeout = p.get('timeout')
-    
+    cmd = p.get("command", "")
+    timeout = p.get("timeout")
+
     # Truncate long commands
     cmd_display = _truncate(cmd, 65)
-    
+
     # Show timeout if non-default
     if timeout and timeout != 30000:
         timeout_sec = timeout / 1000
         if timeout_sec >= 60:
-            return f"$ {cmd_display} ({timeout_sec/60:.0f}m)"
+            return f"$ {cmd_display} ({timeout_sec / 60:.0f}m)"
         else:
             return f"$ {cmd_display} ({timeout_sec:.0f}s)"
-    
+
     return f"$ {cmd_display}"
+
 
 def _shell_result(output: str, status: str) -> str:
     """Return result description WITHOUT status icon (CLI adds it)."""
     if status == "error":
         # Try to extract useful error info
-        lines = output.strip().split('\n') if output else []
+        lines = output.strip().split("\n") if output else []
         if lines:
             last_line = lines[-1].strip()
             if last_line:
                 return _truncate(last_line, 60)
         return _truncate(output, 60) if output else "failed"
-    
-    lines = [l for l in output.strip().split('\n') if l.strip()] if output else []
+
+    lines = [ln for ln in output.strip().split("\n") if ln.strip()] if output else []
     if not lines:
         return "(no output)"
     elif len(lines) == 1:
@@ -184,6 +193,7 @@ def _shell_result(output: str, status: str) -> str:
         # Show line count and preview of last meaningful line
         last = _truncate(lines[-1], 40)
         return f"{len(lines)} lines: {last}"
+
 
 SHELL = ToolSpec(
     name="shell",
@@ -205,12 +215,14 @@ SHELL = ToolSpec(
 def _read_brief(p: dict) -> str:
     return f"📄 {p.get('file_path', '')}"
 
+
 def _read_result(output: str, status: str) -> str:
     """Return result description WITHOUT status icon (CLI adds it)."""
     if status == "error":
         return _truncate(output, 60)
-    lines = output.strip().split('\n') if output else []
+    lines = output.strip().split("\n") if output else []
     return f"{len(lines)} lines"
+
 
 READ = ToolSpec(
     name="read",
@@ -218,7 +230,10 @@ READ = ToolSpec(
     parameters={
         "file_path": {"type": "string", "description": "The path to the file to read"},
         "offset": {"type": "number", "description": "Skip N lines from the start (default: 0)"},
-        "limit": {"type": "number", "description": "Maximum number of lines to read (default: 2000)"},
+        "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read (default: 2000)",
+        },
     },
     required_params=["file_path"],
     category=ToolCategory.FILE_READ,
@@ -231,8 +246,9 @@ READ = ToolSpec(
 
 # Write tool
 def _write_brief(p: dict) -> str:
-    content = p.get('content', '')
+    content = p.get("content", "")
     return f"📝 {p.get('file_path', '')} ({len(content)} chars)"
+
 
 WRITE = ToolSpec(
     name="write",
@@ -253,6 +269,7 @@ WRITE = ToolSpec(
 def _edit_brief(p: dict) -> str:
     return f"✏️  {p.get('file_path', '')}"
 
+
 EDIT = ToolSpec(
     name="edit",
     description=load_tool_description("edit"),
@@ -271,8 +288,9 @@ EDIT = ToolSpec(
 
 # Multiedit tool
 def _multiedit_brief(p: dict) -> str:
-    edits = p.get('edits', [])
+    edits = p.get("edits", [])
     return f"✏️  {len(edits)} edits"
+
 
 MULTIEDIT = ToolSpec(
     name="multiedit",
@@ -289,7 +307,7 @@ MULTIEDIT = ToolSpec(
                     "new_text": {"type": "string"},
                 },
                 "required": ["file_path", "old_text", "new_text"],
-            }
+            },
         }
     },
     required_params=["edits"],
@@ -304,22 +322,30 @@ MULTIEDIT = ToolSpec(
 def _grep_brief(p: dict) -> str:
     return f"🔍 '{_truncate(p.get('pattern', ''), 30)}' in {p.get('path', '.')}"
 
+
 def _grep_result(output: str, status: str) -> str:
     """Return result description WITHOUT status icon (CLI adds it)."""
     if status == "error":
         return _truncate(output, 60)
     if "No matches found" in output:
         return "no matches"
-    lines = output.strip().split('\n') if output else []
+    lines = output.strip().split("\n") if output else []
     return f"{len(lines)} matches"
+
 
 GREP = ToolSpec(
     name="grep",
     description=load_tool_description("grep"),
     parameters={
         "pattern": {"type": "string", "description": "The regex pattern to search for"},
-        "path": {"type": "string", "description": "The path to search in (default: current directory)"},
-        "include_pattern": {"type": "string", "description": "File pattern to include (e.g., '*.py')"},
+        "path": {
+            "type": "string",
+            "description": "The path to search in (default: current directory)",
+        },
+        "include_pattern": {
+            "type": "string",
+            "description": "File pattern to include (e.g., '*.py')",
+        },
     },
     required_params=["pattern"],
     category=ToolCategory.SEARCH,
@@ -334,19 +360,24 @@ GREP = ToolSpec(
 def _glob_brief(p: dict) -> str:
     return f"📂 {p.get('pattern', '')} in {p.get('path', '.')}"
 
+
 def _glob_result(output: str, status: str) -> str:
     """Return result description WITHOUT status icon (CLI adds it)."""
     if status == "error":
         return _truncate(output, 60)
-    lines = [l for l in output.strip().split('\n') if l] if output else []
+    lines = [ln for ln in output.strip().split("\n") if ln] if output else []
     return f"{len(lines)} files"
+
 
 GLOB = ToolSpec(
     name="glob",
     description=load_tool_description("glob"),
     parameters={
         "pattern": {"type": "string", "description": "The glob pattern (e.g., '**/*.py')"},
-        "path": {"type": "string", "description": "The base path to search from (default: current directory)"},
+        "path": {
+            "type": "string",
+            "description": "The base path to search from (default: current directory)",
+        },
     },
     required_params=["pattern"],
     category=ToolCategory.SEARCH,
@@ -362,9 +393,10 @@ GLOB = ToolSpec(
 
 # Task/subagent tool
 def _task_brief(p: dict) -> str:
-    agent = p.get('agent_type', 'general')
-    goal = p.get('goal', '') or p.get('description', '')
+    agent = p.get("agent_type", "general")
+    goal = p.get("goal", "") or p.get("description", "")
     return f"🤖 [{agent}] {_truncate(goal, 40)}"
+
 
 TASK = ToolSpec(
     name="task",
@@ -384,8 +416,9 @@ TASK = ToolSpec(
 
 # Todowrite tool
 def _todo_brief(p: dict) -> str:
-    todos = p.get('todos', [])
+    todos = p.get("todos", [])
     return f"📋 {len(todos)} todos"
+
 
 TODOWRITE = ToolSpec(
     name="todowrite",
@@ -402,7 +435,7 @@ TODOWRITE = ToolSpec(
                     "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
                 },
                 "required": ["id", "content", "status"],
-            }
+            },
         },
         "session_id": {"type": "string", "description": "Session ID (auto-filled)"},
     },
@@ -417,6 +450,7 @@ TODOWRITE = ToolSpec(
 # TodoRead tool
 def _todoread_brief(p: dict) -> str:
     return "📋 reading todos"
+
 
 TODOREAD = ToolSpec(
     name="todoread",
@@ -436,6 +470,7 @@ TODOREAD = ToolSpec(
 def _question_brief(p: dict) -> str:
     questions = p.get("questions", [])
     return f"❓ {len(questions)} question(s)"
+
 
 QUESTION = ToolSpec(
     name="question",
@@ -458,12 +493,12 @@ QUESTION = ToolSpec(
                                 "description": {"type": "string"},
                             },
                             "required": ["label"],
-                        }
+                        },
                     },
                     "header": {"type": "string", "description": "Optional header/title"},
                 },
                 "required": ["question"],
-            }
+            },
         }
     },
     required_params=["questions"],
@@ -479,6 +514,7 @@ def _batch_brief(p: dict) -> str:
     calls = p.get("tool_calls", [])
     return f"⚡ batch: {len(calls)} tools"
 
+
 BATCH = ToolSpec(
     name="batch",
     description=load_tool_description("batch"),
@@ -493,7 +529,7 @@ BATCH = ToolSpec(
                     "input": {"type": "object", "description": "Tool input parameters"},
                 },
                 "required": ["tool", "input"],
-            }
+            },
         }
     },
     required_params=["tool_calls"],
@@ -508,9 +544,12 @@ BATCH = ToolSpec(
 def _skill_brief(p: dict) -> str:
     return f"📚 loading skill: {p.get('name', 'unknown')}"
 
+
 SKILL = ToolSpec(
     name="skill",
-    description=load_tool_description("skill"),  # Base description, dynamically extended with available skills
+    description=load_tool_description(
+        "skill"
+    ),  # Base description, dynamically extended with available skills
     parameters={
         "name": {"type": "string", "description": "The skill identifier from available_skills"},
     },
@@ -524,20 +563,21 @@ SKILL = ToolSpec(
 
 # ==================== Tool Registry ====================
 
+
 class ToolRegistry:
     """
     Central registry for all tools.
-    
+
     Usage:
         registry = ToolRegistry()
         spec = registry.get("shell")
         all_schemas = registry.get_llm_schemas()
     """
-    
+
     def __init__(self):
         self._tools: dict[str, ToolSpec] = {}
         self._register_defaults()
-    
+
     def _register_defaults(self):
         """Register all default tools."""
         # Core tools:
@@ -559,34 +599,43 @@ class ToolRegistry:
         # Removed (will be provided via MCP):
         # - web_search, web_fetch
         defaults = [
-            SHELL, READ, WRITE, EDIT, MULTIEDIT,
-            GREP, GLOB,
-            TASK, TODOWRITE, TODOREAD,
-            QUESTION, BATCH, SKILL,
+            SHELL,
+            READ,
+            WRITE,
+            EDIT,
+            MULTIEDIT,
+            GREP,
+            GLOB,
+            TASK,
+            TODOWRITE,
+            TODOREAD,
+            QUESTION,
+            BATCH,
+            SKILL,
         ]
         for spec in defaults:
             self.register(spec)
-    
+
     def register(self, spec: ToolSpec) -> None:
         """Register a tool specification."""
         self._tools[spec.name] = spec
-    
-    def get(self, name: str) -> Optional[ToolSpec]:
+
+    def get(self, name: str) -> ToolSpec | None:
         """Get a tool specification by name."""
         return self._tools.get(name)
-    
+
     def get_all(self) -> list[ToolSpec]:
         """Get all registered tools."""
         return list(self._tools.values())
-    
+
     def get_llm_schemas(self) -> list[dict]:
         """Get all tools in LLM schema format."""
         return [spec.to_llm_schema() for spec in self._tools.values()]
-    
+
     def format_tool_start(self, tool_name: str, params: dict) -> dict:
         """
         Format tool-start event data.
-        
+
         Returns a dict with all display information.
         """
         spec = self.get(tool_name)
@@ -605,11 +654,13 @@ class ToolRegistry:
             "icon": "▶",
             "category": "unknown",
         }
-    
-    def format_tool_complete(self, tool_name: str, output: str, status: str, duration: float) -> dict:
+
+    def format_tool_complete(
+        self, tool_name: str, output: str, status: str, duration: float
+    ) -> dict:
         """
         Format tool-complete event data.
-        
+
         Returns a dict with all display information.
         """
         spec = self.get(tool_name)
@@ -633,7 +684,7 @@ class ToolRegistry:
 
 
 # Global registry instance
-_registry: Optional[ToolRegistry] = None
+_registry: ToolRegistry | None = None
 
 
 def get_registry() -> ToolRegistry:

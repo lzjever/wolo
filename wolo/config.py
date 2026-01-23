@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Any, Optional
+from typing import Any
 
 import yaml
 
@@ -11,6 +11,7 @@ import yaml
 @dataclass
 class EndpointConfig:
     """Configuration for a single API endpoint."""
+
     name: str
     model: str
     api_base: str
@@ -23,13 +24,14 @@ class EndpointConfig:
 @dataclass
 class ClaudeCompatConfig:
     """Configuration for Claude compatibility mode."""
+
     enabled: bool = False
-    config_dir: Optional[Path] = None  # Default: ~/.claude
-    
+    config_dir: Path | None = None  # Default: ~/.claude
+
     # What to load from Claude
     load_skills: bool = True
     load_mcp: bool = True
-    
+
     # MCP settings
     node_strategy: str = "auto"  # auto, require, skip, python_fallback
 
@@ -37,6 +39,7 @@ class ClaudeCompatConfig:
 @dataclass
 class MCPConfig:
     """MCP configuration."""
+
     enabled: bool = True
     node_strategy: str = "auto"  # auto, require, skip, python_fallback
     servers: dict = field(default_factory=dict)  # name -> MCPServerConfig dict
@@ -49,17 +52,17 @@ class Config:
     base_url: str
     temperature: float
     max_tokens: int
-    mcp_servers: List[str] = field(default_factory=list)
+    mcp_servers: list[str] = field(default_factory=list)
     debug_llm_file: str | None = None  # File to write LLM requests/responses for debugging
     debug_full_dir: str | None = None  # Directory to save full request/response logs
     enable_think: bool = False  # Enable GLM thinking mode
-    
+
     # Claude compatibility
     claude: ClaudeCompatConfig = field(default_factory=ClaudeCompatConfig)
-    
+
     # MCP configuration
     mcp: MCPConfig = field(default_factory=MCPConfig)
-    
+
     # Compaction configuration (lazy import to avoid circular dependency)
     compaction: Any = None  # Type: CompactionConfig | None
 
@@ -71,34 +74,37 @@ class Config:
             return {}
 
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning(f"Failed to load config file: {e}")
             return {}
 
     @classmethod
-    def _get_endpoints(cls) -> List[EndpointConfig]:
+    def _get_endpoints(cls) -> list[EndpointConfig]:
         """Get all configured endpoints from config file."""
         config_data = cls._load_config_file()
         endpoints_data = config_data.get("endpoints", [])
 
         endpoints = []
         for ep in endpoints_data:
-            endpoints.append(EndpointConfig(
-                name=ep["name"],
-                model=ep["model"],
-                api_base=ep["api_base"],
-                api_key=ep["api_key"],
-                temperature=ep.get("temperature", 0.7),
-                max_tokens=ep.get("max_tokens", 16384),
-                source_model=ep.get("source_model")
-            ))
+            endpoints.append(
+                EndpointConfig(
+                    name=ep["name"],
+                    model=ep["model"],
+                    api_base=ep["api_base"],
+                    api_key=ep["api_key"],
+                    temperature=ep.get("temperature", 0.7),
+                    max_tokens=ep.get("max_tokens", 16384),
+                    source_model=ep.get("source_model"),
+                )
+            )
         return endpoints
 
     @classmethod
-    def list_endpoints(cls) -> List[str]:
+    def list_endpoints(cls) -> list[str]:
         """List available endpoint names."""
         endpoints = cls._get_endpoints()
         return [ep.name for ep in endpoints]
@@ -119,7 +125,9 @@ class Config:
                     selected_endpoint = ep
                     break
             if not selected_endpoint:
-                raise ValueError(f"Endpoint '{endpoint_name}' not found in config file. Available: {', '.join(ep.name for ep in endpoints)}")
+                raise ValueError(
+                    f"Endpoint '{endpoint_name}' not found in config file. Available: {', '.join(ep.name for ep in endpoints)}"
+                )
         elif endpoints:
             # Use default endpoint from config, or first endpoint
             default_name = config_data.get("default_endpoint")
@@ -162,8 +170,12 @@ class Config:
         claude_config = ClaudeCompatConfig(
             enabled=claude_data.get("enabled", False),
             config_dir=Path(claude_data["config_dir"]) if claude_data.get("config_dir") else None,
-            load_skills=claude_data.get("skills", {}).get("enabled", True) if isinstance(claude_data.get("skills"), dict) else claude_data.get("load_skills", True),
-            load_mcp=claude_data.get("mcp", {}).get("enabled", True) if isinstance(claude_data.get("mcp"), dict) else claude_data.get("load_mcp", True),
+            load_skills=claude_data.get("skills", {}).get("enabled", True)
+            if isinstance(claude_data.get("skills"), dict)
+            else claude_data.get("load_skills", True),
+            load_mcp=claude_data.get("mcp", {}).get("enabled", True)
+            if isinstance(claude_data.get("mcp"), dict)
+            else claude_data.get("load_mcp", True),
             node_strategy=claude_data.get("node_strategy", "auto"),
         )
 
@@ -182,6 +194,7 @@ class Config:
 
         # Load compaction config
         from wolo.compaction.config import load_compaction_config
+
         compaction_data = config_data.get("compaction", {})
         compaction_config = load_compaction_config(compaction_data)
 

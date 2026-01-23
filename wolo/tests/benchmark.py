@@ -69,60 +69,74 @@ class BenchmarkRunner:
         logger.info("Starting benchmark suite...")
 
         # Test 1: Simple query (no tools expected)
-        self.results.append(await self.run_test(
-            "simple_math",
-            "general",
-            "What is 25 * 37? Just give me the number."
-        ))
+        self.results.append(
+            await self.run_test(
+                "simple_math", "general", "What is 25 * 37? Just give me the number."
+            )
+        )
 
         # Test 2: File read operation
-        self.results.append(await self.run_test(
-            "file_read",
-            "general",
-            "Read the file /home/percy/works/mygithub/opencode/wolo/SUMMARY.md and summarize it in one sentence."
-        ))
+        self.results.append(
+            await self.run_test(
+                "file_read",
+                "general",
+                "Read the file /home/percy/works/mygithub/opencode/wolo/SUMMARY.md and summarize it in one sentence.",
+            )
+        )
 
         # Test 3: Code search operation
-        self.results.append(await self.run_test(
-            "code_search",
-            "general",
-            "Use grep to find all files in wolo that contain 'async def' pattern. Count how many matches you find."
-        ))
+        self.results.append(
+            await self.run_test(
+                "code_search",
+                "general",
+                "Use grep to find all files in wolo that contain 'async def' pattern. Count how many matches you find.",
+            )
+        )
 
         # Test 4: Glob operation
-        self.results.append(await self.run_test(
-            "glob_search",
-            "general",
-            "Use glob to find all Python files in the wolo directory. How many files did you find?"
-        ))
+        self.results.append(
+            await self.run_test(
+                "glob_search",
+                "general",
+                "Use glob to find all Python files in the wolo directory. How many files did you find?",
+            )
+        )
 
         # Test 5: Multi-step task with file write
-        self.results.append(await self.run_test(
-            "file_write",
-            "general",
-            "Create a file called /tmp/wolo_bench_test.txt with content 'Hello from Wolo Benchmark!'"
-        ))
+        self.results.append(
+            await self.run_test(
+                "file_write",
+                "general",
+                "Create a file called /tmp/wolo_bench_test.txt with content 'Hello from Wolo Benchmark!'",
+            )
+        )
 
         # Test 6: Subagent delegation
-        self.results.append(await self.run_test(
-            "subagent_task",
-            "general",
-            "Use the task tool to spawn an explore agent to analyze the wolo directory structure."
-        ))
+        self.results.append(
+            await self.run_test(
+                "subagent_task",
+                "general",
+                "Use the task tool to spawn an explore agent to analyze the wolo directory structure.",
+            )
+        )
 
         # Test 7: Plan mode
-        self.results.append(await self.run_test(
-            "plan_mode",
-            "plan",
-            "Create a plan for adding a new feature to wolo that tracks user preferences."
-        ))
+        self.results.append(
+            await self.run_test(
+                "plan_mode",
+                "plan",
+                "Create a plan for adding a new feature to wolo that tracks user preferences.",
+            )
+        )
 
         # Test 8: Explore mode
-        self.results.append(await self.run_test(
-            "explore_mode",
-            "explore",
-            "Analyze the wolo tools implementation and explain how the shell tool works."
-        ))
+        self.results.append(
+            await self.run_test(
+                "explore_mode",
+                "explore",
+                "Analyze the wolo tools implementation and explain how the shell tool works.",
+            )
+        )
 
         # Clean up test file
         try:
@@ -169,7 +183,7 @@ def generate_comparison_report(results: list[dict[str, Any]]) -> str:
     report_lines.append("-" * 80)
     report_lines.append(f"Total Tests: {len(results)}")
     report_lines.append(f"Total Tokens: {total_tokens}")
-    report_lines.append(f"Total Duration: {total_duration:.0f}ms ({total_duration/1000:.1f}s)")
+    report_lines.append(f"Total Duration: {total_duration:.0f}ms ({total_duration / 1000:.1f}s)")
     report_lines.append(f"Total Steps: {total_steps}")
     report_lines.append(f"Total LLM Calls: {total_llm_calls}")
     report_lines.append(f"Total Tool Calls: {total_tools}")
@@ -189,10 +203,18 @@ def generate_comparison_report(results: list[dict[str, Any]]) -> str:
 
         report_lines.append("PERFORMANCE EXTREMES:")
         report_lines.append("-" * 80)
-        report_lines.append(f"Fastest: {fastest.get('name', 'unknown')} ({fastest.get('total_duration_ms', 0):.0f}ms)")
-        report_lines.append(f"Slowest: {slowest.get('name', 'unknown')} ({slowest.get('total_duration_ms', 0):.0f}ms)")
-        report_lines.append(f"Most Tokens: {most_tokens.get('name', 'unknown')} ({most_tokens.get('total_tokens', 0)} tokens)")
-        report_lines.append(f"Fewest Tokens: {fewest_tokens.get('name', 'unknown')} ({fewest_tokens.get('total_tokens', 0)} tokens)")
+        report_lines.append(
+            f"Fastest: {fastest.get('name', 'unknown')} ({fastest.get('total_duration_ms', 0):.0f}ms)"
+        )
+        report_lines.append(
+            f"Slowest: {slowest.get('name', 'unknown')} ({slowest.get('total_duration_ms', 0):.0f}ms)"
+        )
+        report_lines.append(
+            f"Most Tokens: {most_tokens.get('name', 'unknown')} ({most_tokens.get('total_tokens', 0)} tokens)"
+        )
+        report_lines.append(
+            f"Fewest Tokens: {fewest_tokens.get('name', 'unknown')} ({fewest_tokens.get('total_tokens', 0)} tokens)"
+        )
         report_lines.append("")
 
     # Agent type breakdown
@@ -209,7 +231,9 @@ def generate_comparison_report(results: list[dict[str, Any]]) -> str:
         for agent_type, agent_results in by_agent.items():
             avg_dur = sum(r.get("total_duration_ms", 0) for r in agent_results) / len(agent_results)
             avg_tok = sum(r.get("total_tokens", 0) for r in agent_results) / len(agent_results)
-            report_lines.append(f"{agent_type:12s} - {len(agent_results)} tests, avg {avg_dur:.0f}ms, avg {avg_tok:.0f} tokens")
+            report_lines.append(
+                f"{agent_type:12s} - {len(agent_results)} tests, avg {avg_dur:.0f}ms, avg {avg_tok:.0f} tokens"
+            )
         report_lines.append("")
 
     # Most used tools across all tests

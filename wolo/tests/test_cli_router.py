@@ -1,6 +1,5 @@
 """Tests for CLI command routing."""
 
-import pytest
 from wolo.cli.main import _route_command
 
 
@@ -94,7 +93,7 @@ def test_route_with_stdin():
     command_type, remaining = _route_command([], True)
     assert command_type == "execute"
     assert remaining == []
-    
+
     # With stdin and args (not help), should route to execute
     command_type, remaining = _route_command(["message"], True)
     assert command_type == "execute"

@@ -1,6 +1,6 @@
 """FileTime tracking tests."""
+
 import time
-from pathlib import Path
 
 import pytest
 

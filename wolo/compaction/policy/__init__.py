@@ -10,8 +10,8 @@ Available Policies:
 """
 
 from wolo.compaction.policy.base import CompactionPolicy
-from wolo.compaction.policy.summary import SummaryCompactionPolicy
 from wolo.compaction.policy.pruning import ToolOutputPruningPolicy
+from wolo.compaction.policy.summary import SummaryCompactionPolicy
 
 __all__ = [
     "CompactionPolicy",

@@ -1,12 +1,12 @@
 """Agent definitions and permission rulesets for Wolo."""
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass
 class PermissionRule:
     """A permission rule for tool access."""
+
     tool: str
     action: str  # "allow", "ask", "deny"
 
@@ -14,6 +14,7 @@ class PermissionRule:
 @dataclass
 class AgentConfig:
     """Configuration for an agent type."""
+
     name: str
     description: str
     permissions: list[PermissionRule]
@@ -28,9 +29,7 @@ READ_ONLY = "read_only"
 ASK_DANGEROUS = "ask_dangerous"
 
 # Dangerous operations that require confirmation
-DANGEROUS_TOOLS = {
-    "write", "edit", "multiedit", "shell"
-}
+DANGEROUS_TOOLS = {"write", "edit", "multiedit", "shell"}
 
 
 def get_permissions(ruleset: str) -> list[PermissionRule]:
@@ -248,7 +247,7 @@ The system may indicate you can finish early. IGNORE THIS and keep going until a
 - Use specialized tools instead of bash commands when possible
 - Reserve bash tools for actual system commands
 
-Remember: The user wants you to ACT, not talk. Use tools! Complete the FULL request, verify it works, and only then stop."""
+Remember: The user wants you to ACT, not talk. Use tools! Complete the FULL request, verify it works, and only then stop.""",
 )
 
 
@@ -331,7 +330,7 @@ You have access to read-only tools:
 - You are in READ-ONLY mode - cannot write, edit, or execute shell commands
 - Be specific about file paths and code locations
 - Always complete the current stage before asking to advance
-- Focus on creating actionable, detailed plans"""
+- Focus on creating actionable, detailed plans""",
 )
 
 
@@ -368,7 +367,7 @@ You have access to read-only tools:
 
 Be thorough but efficient. Start with broad searches, then narrow down to specific files.
 
-You are in READ-ONLY mode and cannot make changes."""
+You are in READ-ONLY mode and cannot make changes.""",
 )
 
 
@@ -405,7 +404,7 @@ Provide a structured summary with:
 - **Key Findings**: Important discoveries
 - **Remaining Work**: What still needs to be done
 
-Be concise but preserve all critical information."""
+Be concise but preserve all critical information.""",
 )
 
 

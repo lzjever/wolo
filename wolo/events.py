@@ -1,7 +1,8 @@
 """Event bus for UI updates and agent events."""
 
 import asyncio
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class EventBus:

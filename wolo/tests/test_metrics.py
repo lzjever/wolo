@@ -2,14 +2,11 @@
 
 import json
 from datetime import datetime, timedelta
-from unittest.mock import patch
-
-import pytest
 
 from wolo.metrics import (
-    StepMetrics,
-    SessionMetrics,
     MetricsCollector,
+    SessionMetrics,
+    StepMetrics,
     generate_report,
 )
 
@@ -25,7 +22,7 @@ class TestStepMetrics:
             prompt_tokens=100,
             completion_tokens=50,
             tool_calls=[{"tool": "read", "input": {"file_path": "test.txt"}}],
-            tool_duration_ms=100.0
+            tool_duration_ms=100.0,
         )
         assert step.step_number == 1
         assert step.llm_latency_ms == 1234.5
@@ -41,7 +38,7 @@ class TestStepMetrics:
             prompt_tokens=100,
             completion_tokens=50,
             tool_calls=[{"tool": "read"}],
-            tool_duration_ms=100.0
+            tool_duration_ms=100.0,
         )
         result = step.to_dict()
         assert result["step_number"] == 1
@@ -56,9 +53,7 @@ class TestSessionMetrics:
     def test_create_session_metrics(self):
         """Test creating a SessionMetrics instance."""
         session = SessionMetrics(
-            session_id="test-session-123",
-            agent_type="general",
-            start_time=datetime.now()
+            session_id="test-session-123", agent_type="general", start_time=datetime.now()
         )
         assert session.session_id == "test-session-123"
         assert session.agent_type == "general"
@@ -67,11 +62,7 @@ class TestSessionMetrics:
 
     def test_session_properties_empty(self):
         """Test session properties when empty."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         assert session.total_tokens == 0
         assert session.total_duration_ms == 0
         assert session.avg_llm_latency_ms == 0
@@ -81,10 +72,7 @@ class TestSessionMetrics:
         now = datetime.now()
         later = now + timedelta(seconds=5)
         session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=now,
-            end_time=later
+            session_id="test", agent_type="general", start_time=now, end_time=later
         )
         session.total_prompt_tokens = 1000
         session.total_completion_tokens = 500
@@ -96,18 +84,14 @@ class TestSessionMetrics:
 
     def test_record_step(self):
         """Test recording a step."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         step = StepMetrics(
             step_number=1,
             llm_latency_ms=1000,
             prompt_tokens=100,
             completion_tokens=50,
             tool_calls=[{"tool": "read"}],
-            tool_duration_ms=100
+            tool_duration_ms=100,
         )
         session.record_step(step)
 
@@ -120,18 +104,14 @@ class TestSessionMetrics:
 
     def test_record_multiple_steps_same_tool(self):
         """Test recording multiple steps with same tool."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         step1 = StepMetrics(
             step_number=1,
             llm_latency_ms=1000,
             prompt_tokens=100,
             completion_tokens=50,
             tool_calls=[{"tool": "read"}],
-            tool_duration_ms=100
+            tool_duration_ms=100,
         )
         step2 = StepMetrics(
             step_number=2,
@@ -139,7 +119,7 @@ class TestSessionMetrics:
             prompt_tokens=200,
             completion_tokens=80,
             tool_calls=[{"tool": "read"}, {"tool": "grep"}],
-            tool_duration_ms=200
+            tool_duration_ms=200,
         )
         session.record_step(step1)
         session.record_step(step2)
@@ -153,27 +133,16 @@ class TestSessionMetrics:
 
     def test_record_tool_error(self):
         """Test recording a tool error."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         session.record_tool_error("read", "file_not_found")
         session.record_tool_error("write", "permission_denied")
 
         assert session.tool_errors == 2
-        assert session.errors_by_category == {
-            "file_not_found": 1,
-            "permission_denied": 1
-        }
+        assert session.errors_by_category == {"file_not_found": 1, "permission_denied": 1}
 
     def test_record_subagent_session(self):
         """Test recording subagent sessions."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         session.record_subagent_session("sub-1")
         session.record_subagent_session("sub-2")
 
@@ -181,11 +150,7 @@ class TestSessionMetrics:
 
     def test_finalize(self):
         """Test finalizing a session."""
-        session = SessionMetrics(
-            session_id="test",
-            agent_type="general",
-            start_time=datetime.now()
-        )
+        session = SessionMetrics(session_id="test", agent_type="general", start_time=datetime.now())
         session.finalize("stop")
 
         assert session.end_time is not None
@@ -194,11 +159,7 @@ class TestSessionMetrics:
     def test_to_dict(self):
         """Test converting session to dictionary."""
         now = datetime.now()
-        session = SessionMetrics(
-            session_id="test-123",
-            agent_type="general",
-            start_time=now
-        )
+        session = SessionMetrics(session_id="test-123", agent_type="general", start_time=now)
         session.finalize("stop")
 
         result = session.to_dict()
@@ -321,23 +282,25 @@ class TestGenerateReport:
 
     def test_single_result(self):
         """Test report with a single result."""
-        results = [{
-            "name": "test",
-            "agent_type": "general",
-            "total_steps": 5,
-            "total_tokens": 1000,
-            "tool_calls": 3,
-            "total_duration_ms": 5000,
-            "finish_reason": "stop",
-            "llm_calls": 5,
-            "avg_llm_latency_ms": 800,
-            "total_prompt_tokens": 700,
-            "total_completion_tokens": 300,
-            "tool_errors": 0,
-            "subagent_count": 0,
-            "tools_by_name": {"read": 2, "grep": 1},
-            "errors_by_category": {}
-        }]
+        results = [
+            {
+                "name": "test",
+                "agent_type": "general",
+                "total_steps": 5,
+                "total_tokens": 1000,
+                "tool_calls": 3,
+                "total_duration_ms": 5000,
+                "finish_reason": "stop",
+                "llm_calls": 5,
+                "avg_llm_latency_ms": 800,
+                "total_prompt_tokens": 700,
+                "total_completion_tokens": 300,
+                "tool_errors": 0,
+                "subagent_count": 0,
+                "tools_by_name": {"read": 2, "grep": 1},
+                "errors_by_category": {},
+            }
+        ]
         report = generate_report(results)
         assert "test" in report
         assert "WOLO BENCHMARK RESULTS" in report
@@ -362,7 +325,7 @@ class TestGenerateReport:
                 "tool_errors": 0,
                 "subagent_count": 0,
                 "tools_by_name": {"read": 1},
-                "errors_by_category": {}
+                "errors_by_category": {},
             },
             {
                 "name": "test2",
@@ -379,8 +342,8 @@ class TestGenerateReport:
                 "tool_errors": 1,
                 "subagent_count": 0,
                 "tools_by_name": {"read": 3, "grep": 2},
-                "errors_by_category": {"file_not_found": 1}
-            }
+                "errors_by_category": {"file_not_found": 1},
+            },
         ]
         report = generate_report(results)
         assert "test1" in report

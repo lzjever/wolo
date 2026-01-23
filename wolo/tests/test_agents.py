@@ -1,15 +1,14 @@
 """Test suite for agent permissions."""
 
 import pytest
+
 from wolo.agents import (
-    AgentConfig,
-    PermissionRule,
-    get_permissions,
-    check_permission,
+    COMPACTION_AGENT,
+    EXPLORE_AGENT,
     GENERAL_AGENT,
     PLAN_AGENT,
-    EXPLORE_AGENT,
-    COMPACTION_AGENT,
+    check_permission,
+    get_permissions,
 )
 
 

@@ -4,11 +4,10 @@ import hashlib
 import json
 import logging
 import time
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
-from wolo.agents import AgentConfig, check_permission
+from wolo.agents import AgentConfig
 from wolo.compaction import CompactionManager, CompactionStatus
-from wolo.compaction.token import TokenEstimator
 from wolo.config import Config
 from wolo.events import bus
 from wolo.llm import GLMClient, get_token_usage, reset_token_usage
@@ -30,7 +29,7 @@ from wolo.session import (
     to_llm_messages,
     update_message,
 )
-from wolo.tools import get_all_tools, execute_tool
+from wolo.tools import execute_tool, get_all_tools
 
 if TYPE_CHECKING:
     from wolo.control import ControlManager
@@ -55,7 +54,14 @@ def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
 
     if tool_name == "shell":
         command = tool_input.get("command", "")
-        read_only_prefixes = ("python3 -m py_compile", "ls ", "cat ", "echo ", "git status", "git diff")
+        read_only_prefixes = (
+            "python3 -m py_compile",
+            "ls ",
+            "cat ",
+            "echo ",
+            "git status",
+            "git diff",
+        )
         if any(command.startswith(prefix) for prefix in read_only_prefixes):
             return False
 
@@ -69,7 +75,9 @@ def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
 
     if len(_doom_loop_history) >= DOOM_LOOP_THRESHOLD:
         if len(set(_doom_loop_history)) == 1:
-            logger.warning(f"DOOM LOOP DETECTED: {tool_name} called {DOOM_LOOP_THRESHOLD} times with same input")
+            logger.warning(
+                f"DOOM LOOP DETECTED: {tool_name} called {DOOM_LOOP_THRESHOLD} times with same input"
+            )
             return True
 
     return False
@@ -77,13 +85,13 @@ def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
 
 async def _handle_step_boundary(
     control: Optional["ControlManager"],
-    ui: Optional[Any],
+    ui: Any | None,
     session_id: str,
     agent_config: AgentConfig,
     step: int,
     max_steps: int,
     agent_display_name: str,
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """Handle step boundary control checkpoints. Returns (should_continue, user_input)."""
     if not control:
         return True, None
@@ -96,6 +104,7 @@ async def _handle_step_boundary(
         user_input = await ui.wait_for_input_with_keyboard() if ui else None
 
         from wolo.control import ControlState
+
         control._set_state(ControlState.RUNNING)
 
         if user_input:
@@ -111,14 +120,14 @@ async def _handle_step_boundary(
 async def _handle_pending_tools(
     last_assistant: Message,
     control: Optional["ControlManager"],
-    ui: Optional[Any],
+    ui: Any | None,
     agent_config: AgentConfig,
     session_id: str,
     config: Config,
     step: int,
     agent_display_name: str,
     saver: Optional["SessionSaver"] = None,
-) -> tuple[bool, Optional[str], int]:
+) -> tuple[bool, str | None, int]:
     """Handle pending tool calls. Returns (should_continue, user_input, new_step)."""
     if not has_pending_tool_calls(last_assistant):
         return True, None, step
@@ -140,22 +149,22 @@ async def _handle_pending_tools(
             await control.wait_if_paused()
 
         await execute_tool(tool_call, agent_config, session_id, config)
-        await bus.publish("tool-result", {
-            "tool": tool_call.tool,
-            "output": tool_call.output,
-            "status": tool_call.status
-        })
+        await bus.publish(
+            "tool-result",
+            {"tool": tool_call.tool, "output": tool_call.output, "status": tool_call.status},
+        )
         update_message(session_id, last_assistant)
-        
+
         # Auto-save after each tool call completion
         if saver:
             saver.save()
 
-    tool_duration = (time.time() - tool_start_time) * 1000
+    (time.time() - tool_start_time) * 1000
 
     # Check for interrupt after tool execution
     if control and control.should_interrupt():
         from wolo.control import ControlState
+
         control._set_state(ControlState.WAIT_INPUT)
         logger.info("Waiting for user input after interrupt")
         user_input = await ui.wait_for_input_with_keyboard() if ui else None
@@ -172,7 +181,7 @@ async def _handle_pending_tools(
 
 
 def _should_exit_loop(
-    last_assistant: Optional[Message],
+    last_assistant: Message | None,
     step: int,
     max_steps: int,
     session_id: str,
@@ -184,12 +193,15 @@ def _should_exit_loop(
     finish_reason = (last_assistant.finish_reason or "").lower()
     has_tool_calls = any(isinstance(p, ToolPart) for p in last_assistant.parts)
 
-    logger.debug(f"Checking exit: finished={last_assistant.finished}, finish_reason={finish_reason}, has_tool_calls={has_tool_calls}")
+    logger.debug(
+        f"Checking exit: finished={last_assistant.finished}, finish_reason={finish_reason}, has_tool_calls={has_tool_calls}"
+    )
 
     if has_tool_calls or finish_reason in ("tool_calls", "unknown"):
         return False
 
     from wolo.tools import _todos
+
     session_todos = _todos.get(session_id, [])
     incomplete_todos = [t for t in session_todos if t.get("status") != "completed"]
     logger.debug(f"Incomplete todos: {len(incomplete_todos)}/{len(session_todos)}")
@@ -207,16 +219,17 @@ def _should_exit_loop(
 
 async def _handle_interrupt(
     control: Optional["ControlManager"],
-    ui: Optional[Any],
+    ui: Any | None,
     session_id: str,
     agent_config: AgentConfig,
     agent_display_name: str,
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """Handle user interrupt. Returns (should_continue, user_input)."""
     if not control or not control.should_interrupt():
         return True, None
 
     from wolo.control import ControlState
+
     control._set_state(ControlState.WAIT_INPUT)
     logger.info("Interrupted before LLM call")
     user_input = await ui.wait_for_input_with_keyboard() if ui else None
@@ -244,13 +257,13 @@ async def _call_llm(
     """Call LLM and handle streaming. Returns (assistant_msg, tool_calls, interrupted, llm_start_time)."""
     # Check if we need compaction using the new CompactionManager
     messages_to_use = messages
-    
+
     if config.compaction and config.compaction.enabled and config.compaction.auto_compact:
         check_interval = config.compaction.check_interval_steps
         if step > 0 and step % check_interval == 0:
             compaction_manager = CompactionManager(config.compaction, config)
             decision = compaction_manager.should_compact(messages, session_id)
-            
+
             if decision.should_compact:
                 logger.info(
                     f"Compaction triggered: {decision.current_tokens} tokens "
@@ -311,10 +324,9 @@ async def _call_llm(
                 await control.wait_if_paused()
 
             if event.get("type") == "tool-call":
-                tool_calls_this_step.append({
-                    "tool": event.get("tool"),
-                    "input": event.get("input")
-                })
+                tool_calls_this_step.append(
+                    {"tool": event.get("tool"), "input": event.get("input")}
+                )
             await process_event(event, assistant_msg, current_text_part)
     except Exception as e:
         logger.error(f"Error during LLM call: {e}")
@@ -334,16 +346,18 @@ async def agent_loop(
     excluded_tools: set[str] = None,
     max_steps: int = 100,
     agent_display_name: str = None,
-    is_repl_mode: bool = False
+    is_repl_mode: bool = False,
 ) -> Message:
     """Main agent execution loop."""
     from wolo.agents import GENERAL_AGENT
+
     if agent_config is None:
         agent_config = GENERAL_AGENT
 
     # Get display name if not provided
     if agent_display_name is None:
         from wolo.agent_names import get_random_agent_name
+
         agent_display_name = get_random_agent_name()
 
     step = 0
@@ -357,6 +371,7 @@ async def agent_loop(
 
     from wolo.session import load_session_todos
     from wolo.tools import _todos
+
     persisted_todos = load_session_todos(session_id)
     if persisted_todos:
         _todos[session_id] = persisted_todos
@@ -364,13 +379,16 @@ async def agent_loop(
 
     ui = None
     if control:
-        from wolo.ui import SimpleUI, register_ui
         from wolo.terminal import get_terminal_manager
+        from wolo.ui import SimpleUI, register_ui
+
         terminal = get_terminal_manager()
         ui = SimpleUI(control, terminal=terminal)
         register_ui(ui)
 
-    logger.info(f"Starting agent loop for session {session_id} (agent={agent_config.name}, max_steps={max_steps})")
+    logger.info(
+        f"Starting agent loop for session {session_id} (agent={agent_config.name}, max_steps={max_steps})"
+    )
 
     # Get session saver for auto-save (debounced)
     saver = get_session_saver(session_id)
@@ -402,7 +420,15 @@ async def agent_loop(
             # Handle pending tools
             if last_assistant:
                 should_continue, user_input, step = await _handle_pending_tools(
-                    last_assistant, control, ui, agent_config, session_id, config, step, agent_display_name, saver
+                    last_assistant,
+                    control,
+                    ui,
+                    agent_config,
+                    session_id,
+                    config,
+                    step,
+                    agent_display_name,
+                    saver,
                 )
                 if not should_continue:
                     break
@@ -421,7 +447,7 @@ async def agent_loop(
             elif last_user and not last_assistant:
                 # First message, definitely process it
                 has_new_user_message = True
-            
+
             # Only exit if task is complete AND no new user message
             if not has_new_user_message:
                 if _should_exit_loop(last_assistant, step, max_steps, session_id):
@@ -438,7 +464,9 @@ async def agent_loop(
             logger.debug(f"Created new assistant message: {assistant_msg.id}")
 
             # Check for interrupt before LLM call
-            should_continue, user_input = await _handle_interrupt(control, ui, session_id, agent_config, agent_display_name)
+            should_continue, user_input = await _handle_interrupt(
+                control, ui, session_id, agent_config, agent_display_name
+            )
             if not should_continue:
                 break
             if user_input:
@@ -447,7 +475,15 @@ async def agent_loop(
             # Call LLM
             try:
                 assistant_msg, tool_calls_this_step, interrupted, llm_start_time = await _call_llm(
-                    client, messages, config, session_id, step, max_steps, control, assistant_msg, excluded_tools=excluded_tools
+                    client,
+                    messages,
+                    config,
+                    session_id,
+                    step,
+                    max_steps,
+                    control,
+                    assistant_msg,
+                    excluded_tools=excluded_tools,
                 )
             except Exception as e:
                 metrics.record_tool_error("llm", type(e).__name__)
@@ -456,6 +492,7 @@ async def agent_loop(
             # Handle interrupt during streaming
             if interrupted:
                 from wolo.control import ControlState
+
                 control._set_state(ControlState.WAIT_INPUT)
                 assistant_msg.finished = True
                 assistant_msg.finish_reason = "interrupted"
@@ -472,7 +509,7 @@ async def agent_loop(
 
             # Persist after LLM response
             update_message(session_id, assistant_msg)
-            
+
             # Auto-save after assistant response
             saver.save()
 
@@ -485,7 +522,7 @@ async def agent_loop(
                 prompt_tokens=token_usage.get("prompt_tokens", 0),
                 completion_tokens=token_usage.get("completion_tokens", 0),
                 tool_calls=tool_calls_this_step,
-                tool_duration_ms=0
+                tool_duration_ms=0,
             )
             metrics.record_step(step_metrics)
 
@@ -495,6 +532,7 @@ async def agent_loop(
             if step >= max_steps:
                 logger.warning(f"Max steps ({max_steps}) reached")
                 from wolo.tools import _todos
+
                 session_todos = _todos.get(session_id, [])
                 incomplete_todos = [t for t in session_todos if t.get("status") != "completed"]
 
@@ -503,7 +541,9 @@ async def agent_loop(
 
                 if final_message:
                     warning_text = "\n\n---\n\n**MAXIMUM STEPS REACHED**\n\n"
-                    warning_text += f"The maximum number of steps ({max_steps}) has been reached.\n\n"
+                    warning_text += (
+                        f"The maximum number of steps ({max_steps}) has been reached.\n\n"
+                    )
 
                     if incomplete_todos:
                         warning_text += f"**Remaining tasks ({len(incomplete_todos)}):**\n"
@@ -520,12 +560,15 @@ async def agent_loop(
                     warning_text += "You can provide additional input to continue working on the remaining tasks."
 
                     for part in final_message.parts:
-                        if hasattr(part, 'text'):
+                        if hasattr(part, "text"):
                             part.text += warning_text
                             break
 
                     final_message.finished = True
-                    if not final_message.finish_reason or final_message.finish_reason in ("tool_calls", "unknown"):
+                    if not final_message.finish_reason or final_message.finish_reason in (
+                        "tool_calls",
+                        "unknown",
+                    ):
                         final_message.finish_reason = "max_steps"
 
         logger.info(f"Agent loop completed after {step} steps")
@@ -541,13 +584,16 @@ async def agent_loop(
         # Flush any pending saves before cleanup
         saver.flush()
         remove_session_saver(session_id)
-        
+
         if ui:
             from wolo.ui import unregister_ui
+
             unregister_ui()
 
 
-async def process_event(event: dict[str, Any], message: Message, current_text_part: TextPart) -> None:
+async def process_event(
+    event: dict[str, Any], message: Message, current_text_part: TextPart
+) -> None:
     """Process a streaming event from the LLM."""
     event_type = event.get("type")
 
@@ -567,7 +613,9 @@ async def process_event(event: dict[str, Any], message: Message, current_text_pa
         tool_name = event.get("tool", "")
         tool_input = event.get("input", {})
         tool_call_id = event.get("id", "")
-        logger.info(f"Received tool call: {tool_name} with input: {list(tool_input.keys()) if isinstance(tool_input, dict) else tool_input}")
+        logger.info(
+            f"Received tool call: {tool_name} with input: {list(tool_input.keys()) if isinstance(tool_input, dict) else tool_input}"
+        )
 
         if _check_doom_loop(tool_name, tool_input):
             current_text_part.text += f"\n\n[DOOM LOOP DETECTED: {tool_name} has been called {DOOM_LOOP_THRESHOLD} times with the same input. Stopping to prevent infinite loop.]"
@@ -582,11 +630,7 @@ async def process_event(event: dict[str, Any], message: Message, current_text_pa
 
         part_id = tool_call_id if tool_call_id else ""
         tool_input_dict = tool_input if isinstance(tool_input, dict) else {}
-        tool_part = ToolPart(
-            id=part_id,
-            tool=tool_name,
-            input=tool_input_dict
-        )
+        tool_part = ToolPart(id=part_id, tool=tool_name, input=tool_input_dict)
         message.parts.append(tool_part)
 
     elif event_type == "finish":

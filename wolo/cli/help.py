@@ -11,15 +11,15 @@ from wolo.cli.parser import ParsedArgs
 def show_help(args: ParsedArgs) -> int:
     """
     Show help information.
-    
+
     Args:
         args: Parsed arguments with help context
-        
+
     Returns:
         Exit code
     """
     help_context = args.positional_args if args.positional_args else ["main"]
-    
+
     if help_context[0] == "main":
         show_main_help()
     elif help_context[0] == "session":
@@ -41,7 +41,7 @@ def show_help(args: ParsedArgs) -> int:
         show_command_help("chat")
     else:
         show_main_help()
-    
+
     return ExitCode.SUCCESS
 
 
@@ -200,7 +200,7 @@ USAGE:
 DESCRIPTION:
     Start an interactive REPL session. The agent will respond to each
     message and wait for your next input.
-    
+
     'chat' and 'repl' are synonyms.
 
 OPTIONS:

@@ -1,8 +1,7 @@
 """UI registration mechanism tests."""
-import pytest
 
-from wolo.ui import SimpleUI, get_current_ui, register_ui, unregister_ui
 from wolo.control import ControlManager
+from wolo.ui import SimpleUI, get_current_ui, register_ui, unregister_ui
 
 
 class TestUIRegistration:

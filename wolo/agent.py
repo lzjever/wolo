@@ -10,7 +10,9 @@ from wolo.agents import AgentConfig
 from wolo.compaction import CompactionManager, CompactionStatus
 from wolo.config import Config
 from wolo.events import bus
-from wolo.llm import GLMClient, get_token_usage, reset_token_usage
+
+# Dynamic import based on configuration will be handled in agent_loop function
+from wolo.llm import get_token_usage, reset_token_usage
 from wolo.metrics import MetricsCollector, StepMetrics
 from wolo.session import (
     Message,
@@ -244,7 +246,7 @@ async def _handle_interrupt(
 
 
 async def _call_llm(
-    client: GLMClient,
+    client: Any,  # GLMClient or WoloLLMClient based on configuration
     messages: list[Message],
     config: Config,
     session_id: str,
@@ -361,6 +363,17 @@ async def agent_loop(
         agent_display_name = get_random_agent_name()
 
     step = 0
+
+    # ✅ Dynamic client selection based on configuration
+    if config.use_lexilux_client:
+        from wolo.llm_adapter import WoloLLMClient as GLMClient
+
+        logger.info("Using lexilux-based LLM client (supports all OpenAI-compatible models)")
+    else:
+        from wolo.llm import GLMClient
+
+        logger.info("Using legacy LLM client")
+
     client = GLMClient(config, agent_config, session_id, agent_display_name=agent_display_name)
 
     global _doom_loop_history

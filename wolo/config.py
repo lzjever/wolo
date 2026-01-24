@@ -55,7 +55,14 @@ class Config:
     mcp_servers: list[str] = field(default_factory=list)
     debug_llm_file: str | None = None  # File to write LLM requests/responses for debugging
     debug_full_dir: str | None = None  # Directory to save full request/response logs
-    enable_think: bool = False  # Enable GLM thinking mode
+    enable_think: bool = (
+        False  # Enable reasoning mode for compatible models (OpenAI o1, DeepSeek-R1, etc.)
+    )
+
+    # ✅ NEW: Lexilux migration flag
+    use_lexilux_client: bool = (
+        False  # Use lexilux-based LLM client instead of legacy implementation
+    )
 
     # Claude compatibility
     claude: ClaudeCompatConfig = field(default_factory=ClaudeCompatConfig)
@@ -315,6 +322,15 @@ class Config:
         if not enable_think:
             enable_think = os.getenv("WOLO_ENABLE_THINK", "").lower() in ("true", "1", "yes")
 
+        # ✅ Load use_lexilux_client from config or env
+        use_lexilux_client = config_data.get("use_lexilux_client", False)
+        if not use_lexilux_client:
+            use_lexilux_client = os.getenv("WOLO_USE_LEXILUX_CLIENT", "").lower() in (
+                "true",
+                "1",
+                "yes",
+            )
+
         # Load compaction config
         from wolo.compaction.config import load_compaction_config
 
@@ -329,6 +345,7 @@ class Config:
             max_tokens=max_tokens,
             mcp_servers=mcp_servers,
             enable_think=enable_think,
+            use_lexilux_client=use_lexilux_client,  # ✅ NEW: Include lexilux client flag
             claude=claude_config,
             mcp=mcp_config,
             compaction=compaction_config,

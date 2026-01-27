@@ -158,7 +158,7 @@ class TestShellExecute:
     @pytest.mark.asyncio
     async def test_shell_timeout(self):
         """Shell command timeout."""
-        result = await shell_execute("sleep 10", timeout=100)
+        result = await shell_execute("sleep 10", timeout=200)
 
         assert "timed out" in result["output"].lower()
         assert result["metadata"]["exit_code"] == -1

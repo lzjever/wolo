@@ -136,7 +136,7 @@ async def ask_questions(
         answers = await asyncio.wait_for(future, timeout=timeout)
         return answers
 
-    except TimeoutError:
+    except asyncio.TimeoutError:
         await bus.publish("question-timeout", {"question_id": question_id})
         raise QuestionTimeoutError(f"Question timed out after {timeout}s")
     finally:

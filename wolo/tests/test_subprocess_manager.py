@@ -14,6 +14,19 @@ from wolo.subprocess_manager import (
 )
 
 
+@pytest.fixture(autouse=True)
+def cleanup_global_registry():
+    """Clean up the global subprocess registry before and after each test."""
+    reset_registry()
+    yield
+    reset_registry()
+    # Also cleanup any remaining processes
+    try:
+        asyncio.get_event_loop().run_until_complete(cleanup_all_subprocesses(timeout=0.1))
+    except Exception:
+        pass
+
+
 class MockProcess:
     """Mock subprocess.Process for testing."""
 

@@ -4,11 +4,22 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Skip entire module if lexilux is not available
-pytest.importorskip("lexilux", reason="lexilux not installed")
+# Check if lexilux is available - skip entire module if not
+try:
+    import lexilux  # noqa: F401
+    LEXILUX_AVAILABLE = True
+except ImportError:
+    LEXILUX_AVAILABLE = False
+
+if not LEXILUX_AVAILABLE:
+    pytest.skip("lexilux not installed - requires local path dependency", allow_module_level=True)
 
 from wolo.config import Config
-from wolo.llm_adapter import WoloLLMClient, get_token_usage, reset_token_usage
+
+try:
+    from wolo.llm_adapter import WoloLLMClient, get_token_usage, reset_token_usage
+except ImportError:
+    pytest.skip("lexilux not installed - requires local path dependency", allow_module_level=True)
 
 
 @pytest.fixture

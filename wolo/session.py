@@ -310,7 +310,9 @@ class SessionStorage:
                     agent_name = get_random_agent_name()
                 session_id = _generate_session_id(agent_name)
             else:
-                raise ValueError(f"Session '{session_id}' already exists. Please use a different name.")
+                raise ValueError(
+                    f"Session '{session_id}' already exists. Please use a different name."
+                )
 
         session_dir = self._session_dir(session_id)
         session_dir.mkdir(parents=True, exist_ok=True)

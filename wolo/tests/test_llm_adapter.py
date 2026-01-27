@@ -4,6 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# Skip entire module if lexilux is not available
+pytest.importorskip("lexilux", reason="lexilux not installed")
+
 from wolo.config import Config
 from wolo.llm_adapter import WoloLLMClient, get_token_usage, reset_token_usage
 

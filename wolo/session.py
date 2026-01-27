@@ -285,6 +285,9 @@ class SessionStorage:
         Raises:
             ValueError: 如果指定的 session_id 已存在
         """
+        # Track if session_id was user-provided (for retry logic)
+        user_provided_id = session_id is not None
+
         # 如果未指定 session_id，则自动生成
         if session_id is None:
             if agent_name is None:
@@ -294,23 +297,31 @@ class SessionStorage:
                 agent_name = get_random_agent_name()
             session_id = _generate_session_id(agent_name)
 
-        # 检查 session_id 是否已存在（带重试机制，用于并发场景）
-        max_retries = 5
-        for attempt in range(max_retries):
-            if not self.session_exists(session_id):
-                break
-            if attempt < max_retries - 1:
-                # Session ID collision, wait and regenerate with new timestamp
-                time.sleep(0.6)  # Wait 600ms to ensure timestamp changes
-                if agent_name is None:
-                    from wolo.agent_names import get_random_agent_name
-
-                    agent_name = get_random_agent_name()
-                session_id = _generate_session_id(agent_name)
-            else:
+        # 检查 session_id 是否已存在
+        # 对于用户提供的ID，直接报错；对于自动生成的ID，带重试机制
+        if user_provided_id:
+            if self.session_exists(session_id):
                 raise ValueError(
                     f"Session '{session_id}' already exists. Please use a different name."
                 )
+        else:
+            # Auto-generated ID: retry logic for parallel test scenarios
+            max_retries = 5
+            for attempt in range(max_retries):
+                if not self.session_exists(session_id):
+                    break
+                if attempt < max_retries - 1:
+                    # Session ID collision, wait and regenerate with new timestamp
+                    time.sleep(0.6)  # Wait 600ms to ensure timestamp changes
+                    if agent_name is None:
+                        from wolo.agent_names import get_random_agent_name
+
+                        agent_name = get_random_agent_name()
+                    session_id = _generate_session_id(agent_name)
+                else:
+                    raise ValueError(
+                        f"Session '{session_id}' already exists. Please use a different name."
+                    )
 
         session_dir = self._session_dir(session_id)
         session_dir.mkdir(parents=True, exist_ok=True)

@@ -192,3 +192,16 @@ def has_pending_questions(session_id: str) -> bool:
     检查会话是否有待回答的问题。
     """
     return any(qid.startswith(f"{session_id}_") for qid in _pending_questions)
+
+
+def clear_pending_questions() -> None:
+    """
+    清除所有待回答的问题（用于测试）。
+
+    Warning: 仅在测试环境中使用，会强制取消所有待回答的问题。
+    """
+    global _pending_questions
+    for question_id, future in list(_pending_questions.items()):
+        if not future.done():
+            future.cancel()
+    _pending_questions.clear()

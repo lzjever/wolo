@@ -11,9 +11,18 @@ from wolo.question import (
     QuestionTimeoutError,
     ask_questions,
     cancel_question,
+    clear_pending_questions,
     has_pending_questions,
     submit_answers,
 )
+
+
+@pytest.fixture(autouse=True)
+def cleanup_pending_questions():
+    """Clean up pending questions before and after each test."""
+    clear_pending_questions()
+    yield
+    clear_pending_questions()
 
 
 class TestQuestionInfo:

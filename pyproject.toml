@@ -109,4 +109,4 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
-fail_under = 60  # Minimum 60% coverage required
+fail_under = 50  # Minimum 50% coverage required

@@ -294,9 +294,20 @@ class SessionStorage:
                 agent_name = get_random_agent_name()
             session_id = _generate_session_id(agent_name)
 
-        # 检查 session_id 是否已存在
-        if self.session_exists(session_id):
-            raise ValueError(f"Session '{session_id}' already exists. Please use a different name.")
+        # 检查 session_id 是否已存在（带重试机制，用于并发场景）
+        max_retries = 5
+        for attempt in range(max_retries):
+            if not self.session_exists(session_id):
+                break
+            if attempt < max_retries - 1:
+                # Session ID collision, regenerate with new timestamp
+                if agent_name is None:
+                    from wolo.agent_names import get_random_agent_name
+
+                    agent_name = get_random_agent_name()
+                session_id = _generate_session_id(agent_name)
+            else:
+                raise ValueError(f"Session '{session_id}' already exists. Please use a different name.")
 
         session_dir = self._session_dir(session_id)
         session_dir.mkdir(parents=True, exist_ok=True)

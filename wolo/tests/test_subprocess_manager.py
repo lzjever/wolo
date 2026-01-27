@@ -20,11 +20,6 @@ def cleanup_global_registry():
     reset_registry()
     yield
     reset_registry()
-    # Also cleanup any remaining processes
-    try:
-        asyncio.get_event_loop().run_until_complete(cleanup_all_subprocesses(timeout=0.1))
-    except Exception:
-        pass
 
 
 class MockProcess:
@@ -422,9 +417,6 @@ class TestManagedSubprocessEdgeCases:
 
             def kill(self):
                 raise RuntimeError("Cannot kill")
-
-            async def wait(self):
-                await asyncio.sleep(100)
 
         unkillable = UnkillableProcess()
 

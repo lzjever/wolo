@@ -303,7 +303,7 @@ class SessionStorage:
                 # Session ID collision, wait and regenerate with new timestamp
                 import time
 
-                time.sleep(0.1)  # Wait 100ms to ensure timestamp changes
+                time.sleep(0.6)  # Wait 600ms to ensure timestamp changes
                 if agent_name is None:
                     from wolo.agent_names import get_random_agent_name
 

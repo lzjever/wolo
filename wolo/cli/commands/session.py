@@ -99,7 +99,18 @@ class SessionCreateCommand(BaseCommand):
                 session_id = create_session(agent_name=agent_name)
 
             print(f"Created session: {session_id}")
-            print_session_info(session_id, show_resume_hints=True)
+            # Create output config for print_session_info
+            from wolo.cli.output import OutputConfig
+            from wolo.config import Config
+
+            output_config = OutputConfig.from_args_and_config(
+                output_style=args.execution_options.output_style,
+                no_color=args.execution_options.no_color,
+                show_reasoning=args.execution_options.show_reasoning,
+                json_output=args.execution_options.json_output,
+                config_data=Config._load_config_file(),
+            )
+            print_session_info(session_id, show_resume_hints=True, output_config=output_config)
             return ExitCode.SUCCESS
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
@@ -139,6 +150,7 @@ class SessionListCommand(BaseCommand):
                 message_count = s.get("message_count", 0)
                 is_running = s.get("is_running", False)
                 pid = s.get("pid")
+                workdir = s.get("workdir")
 
                 # Status display
                 status = "(Running)" if is_running else "(Stopped)"
@@ -146,6 +158,10 @@ class SessionListCommand(BaseCommand):
 
                 print(f"  {session_id}{pid_str}")
                 print(f"    {created_str}    {status}    ({message_count} messages)")
+                if workdir:
+                    # Truncate long paths
+                    display_workdir = workdir if len(workdir) <= 50 else "..." + workdir[-47:]
+                    print(f"    📁 {display_workdir}")
                 print()
             print(f"{len(sessions)} session(s) in ~/.wolo/sessions/")
         return ExitCode.SUCCESS
@@ -190,8 +206,19 @@ class SessionShowCommand(BaseCommand):
             print(f"Error: Session '{session_id}' not found", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
-        # Show info with resume hints
-        print_session_info(session_id, show_resume_hints=True)
+        # Show detailed info with resume hints
+        # Create output config for print_session_info
+        from wolo.cli.output import OutputConfig
+        from wolo.config import Config
+
+        output_config = OutputConfig.from_args_and_config(
+            output_style=args.execution_options.output_style,
+            no_color=args.execution_options.no_color,
+            show_reasoning=args.execution_options.show_reasoning,
+            json_output=args.execution_options.json_output,
+            config_data=Config._load_config_file(),
+        )
+        print_session_info(session_id, show_resume_hints=True, output_config=output_config)
         return ExitCode.SUCCESS
 
 
@@ -258,8 +285,26 @@ class SessionResumeCommand(BaseCommand):
             # Load session
             load_session(session_id)
 
+            # Check workdir match (warning only, don't block)
+            from wolo.cli.utils import check_workdir_match, print_workdir_warning
+
+            matches, session_workdir, current_workdir = check_workdir_match(session_id)
+            if not matches and session_workdir:
+                print_workdir_warning(session_workdir, current_workdir)
+
             # Show session info
-            print_session_info(session_id, show_resume_hints=False)
+            # Create output config for print_session_info
+            from wolo.cli.output import OutputConfig
+            from wolo.config import Config
+
+            output_config = OutputConfig.from_args_and_config(
+                output_style=args.execution_options.output_style,
+                no_color=args.execution_options.no_color,
+                show_reasoning=args.execution_options.show_reasoning,
+                json_output=args.execution_options.json_output,
+                config_data=Config._load_config_file(),
+            )
+            print_session_info(session_id, show_resume_hints=False, output_config=output_config)
 
             # Get initial message from pipe or remaining args
             initial_message = ""
@@ -317,8 +362,17 @@ class SessionResumeCommand(BaseCommand):
         mode_config = ModeConfig.for_mode(ExecutionMode.REPL)
         quota_config = QuotaConfig(max_steps=args.execution_options.max_steps)
 
-        # Setup event handlers
-        setup_event_handlers()
+        # Setup output configuration and event handlers
+        from wolo.cli.output import OutputConfig
+
+        output_config = OutputConfig.from_args_and_config(
+            output_style=args.execution_options.output_style,
+            no_color=args.execution_options.no_color,
+            show_reasoning=args.execution_options.show_reasoning,
+            json_output=args.execution_options.json_output,
+            config_data=Config._load_config_file(),
+        )
+        setup_event_handlers(output_config)
 
         # Setup MCP if needed
         async def setup_mcp():
@@ -345,6 +399,7 @@ class SessionResumeCommand(BaseCommand):
                 args.execution_options.save_session,
                 args.execution_options.benchmark_mode,
                 args.execution_options.benchmark_output,
+                output_config,  # Pass output_config for minimal mode check
             )
 
         try:

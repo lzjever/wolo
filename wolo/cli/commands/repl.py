@@ -11,7 +11,7 @@ import sys
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
-from wolo.cli.utils import get_message_from_sources
+from wolo.cli.utils import get_message_from_sources, handle_keyboard_interrupt
 
 
 class ReplCommand(BaseCommand):
@@ -88,13 +88,29 @@ class ReplCommand(BaseCommand):
 
         # Create session
         agent_name = get_random_agent_name()
-        session_id = create_session(agent_name=agent_name)
+        workdir = args.execution_options.workdir  # May be None (defaults to cwd)
+        session_id = create_session(agent_name=agent_name, workdir=workdir)
         from wolo.session import check_and_set_session_pid
 
         check_and_set_session_pid(session_id)
 
-        # Setup event handlers
-        setup_event_handlers()
+        # Setup output configuration and event handlers
+        from wolo.cli.output import OutputConfig
+
+        output_config = OutputConfig.from_args_and_config(
+            output_style=args.execution_options.output_style,
+            no_color=args.execution_options.no_color,
+            show_reasoning=args.execution_options.show_reasoning,
+            json_output=args.execution_options.json_output,
+            config_data=Config._load_config_file(),
+        )
+        setup_event_handlers(output_config)
+
+        # Print session info banner (unless --no-banner)
+        if not args.execution_options.no_banner:
+            from wolo.cli.utils import print_session_info
+
+            print_session_info(session_id, show_resume_hints=False, output_config=output_config)
 
         # Setup MCP if needed
         async def setup_mcp():
@@ -122,12 +138,15 @@ class ReplCommand(BaseCommand):
                 args.execution_options.save_session,
                 args.execution_options.benchmark_mode,
                 args.execution_options.benchmark_output,
+                output_config,  # Pass output_config for minimal mode check
             )
 
         from wolo.cli.async_utils import _suppress_mcp_shutdown_errors, safe_async_run
 
         try:
             return safe_async_run(run_repl())
+        except KeyboardInterrupt:
+            return handle_keyboard_interrupt(session_id)
         except RuntimeError:
             # Event loop already running
             try:
@@ -141,6 +160,11 @@ class ReplCommand(BaseCommand):
                 else:
                     loop.set_exception_handler(_suppress_mcp_shutdown_errors)
                     return loop.run_until_complete(run_repl())
+            except KeyboardInterrupt:
+                return handle_keyboard_interrupt(session_id)
             except Exception:
                 # Fallback: use safe_async_run which creates a new loop
-                return safe_async_run(run_repl())
+                try:
+                    return safe_async_run(run_repl())
+                except KeyboardInterrupt:
+                    return handle_keyboard_interrupt(session_id)

@@ -56,29 +56,36 @@ class WoloLLMClient:
         # 构建 opencode headers
         headers = self._build_opencode_headers(session_id, agent_display_name)
 
-        # ✅ 使用标准 OpenAI 参数 (修正历史遗留的非标准参数)
+        # ✅ 配置 ChatParams
         extra_params = None
         if config.enable_think:
-            # ✅ 推理模式通过 extra 字段 (支持推理模型如 DeepSeek-R1)
-            extra_params = {"thinking": {"type": "enabled", "clear_thinking": False}}
+            # ✅ GLM/DeepSeek 推理模式: 需要 thinking 参数
+            # 参考: https://open.bigmodel.cn/dev/api/thinkingmodel/glm-thinking
+            extra_params = {"thinking": {"type": "enabled"}}
 
-        params = ChatParams(
-            temperature=config.temperature or 0.7, max_tokens=config.max_tokens, extra=extra_params
-        )
+        temperature = config.temperature or 1.0
+        max_tokens = config.max_tokens
+
+        params = ChatParams(temperature=temperature, max_tokens=max_tokens, extra=extra_params)
 
         # 初始化 lexilux Chat 客户端
+        # 超时配置:
+        # - connect_timeout: 10秒连接超时
+        # - read_timeout: 推理模式需要更长超时 (300s)，普通模式 120s
+        read_timeout = 300.0 if config.enable_think else 120.0
         self._lexilux_chat = Chat(
             base_url=config.base_url,
             api_key=config.api_key,
             model=config.model,
             headers=headers,
+            connect_timeout_s=10.0,  # 10秒连接超时
+            read_timeout_s=read_timeout,  # 推理模式 5分钟，普通模式 2分钟
         )
 
         # 存储默认参数
         self._default_params = params
 
         # Wolo 产品配置
-        self._enable_think = config.enable_think
         self._debug_llm_file = config.debug_llm_file
         self._debug_full_dir = config.debug_full_dir
         self._request_count = 0
@@ -86,13 +93,16 @@ class WoloLLMClient:
         self._agent_display_name = agent_display_name
         self._session_id = session_id or "unknown"
 
-        # Store config reference for compatibility
+        # Store config reference for compatibility (public API)
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model = config.model
         self.temperature = config.temperature
         self.max_tokens = config.max_tokens
-        self.enable_think = config.enable_think
+        self.enable_think = config.enable_think  # Used for include_reasoning flag
+
+        # Track which tool calls we've already emitted events for
+        self._emitted_tool_call_starts: set[int] = set()
 
     async def chat_completion(
         self,
@@ -124,8 +134,9 @@ class WoloLLMClient:
         lexilux_messages = self._to_lexilux_messages(messages)
         lexilux_tools = self._convert_tools(tools)
 
-        # Reset finish reason and token usage
+        # Reset finish reason, token usage, and tool call tracking
         self._finish_reason = None
+        self._emitted_tool_call_starts = set()
         _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
         try:
@@ -134,7 +145,7 @@ class WoloLLMClient:
                 messages=lexilux_messages,
                 tools=lexilux_tools,
                 params=self._default_params,
-                include_reasoning=self._enable_think,  # ✅ 使用 lexilux reasoning 功能
+                include_reasoning=self.enable_think,  # ✅ 使用 lexilux reasoning 功能
             )
 
             # 4. 事件格式转换：lexilux → wolo
@@ -157,15 +168,35 @@ class WoloLLMClient:
                 if lexilux_chunk.delta:
                     yield {"type": "text-delta", "text": lexilux_chunk.delta}
 
-                # 工具调用
-                if lexilux_chunk.tool_calls:
-                    for tc in lexilux_chunk.tool_calls:
+                # 工具调用 - 使用 lexilux 的流式 tool call 追踪
+                for stc in lexilux_chunk.streaming_tool_calls:
+                    if stc.is_first and stc.index not in self._emitted_tool_call_starts:
+                        # 首次看到这个 tool call - 立即发出 streaming 事件
+                        self._emitted_tool_call_starts.add(stc.index)
                         yield {
-                            "type": "tool-call",
-                            "tool": tc.name,
-                            "input": tc.get_arguments(),
-                            "id": tc.id,
+                            "type": "tool-call-streaming",
+                            "tool": stc.name,
+                            "id": stc.id,
+                            "length": stc.arguments_length,
                         }
+                    elif not stc.is_first and stc.arguments_delta:
+                        # 后续 chunk 且有新的 arguments - 发出 progress 事件
+                        yield {
+                            "type": "tool-call-progress",
+                            "index": stc.index,
+                            "length": stc.arguments_length,
+                        }
+
+                    if stc.is_complete:
+                        # Tool call 完成 - 发出完整的 tool-call 事件
+                        tc = stc.to_tool_call()
+                        if tc:
+                            yield {
+                                "type": "tool-call",
+                                "tool": tc.name,
+                                "input": tc.get_arguments(),
+                                "id": tc.id,
+                            }
 
                 # 完成
                 if lexilux_chunk.done:
@@ -265,8 +296,12 @@ class WoloLLMClient:
         formatted_messages = []
 
         for msg in messages:
-            # 工具消息和带工具调用的消息保持原样
-            if msg.get("role") == "tool" or "tool_calls" in msg:
+            # 工具消息保持原样
+            if msg.get("role") == "tool":
+                formatted_messages.append(msg)
+            elif "tool_calls" in msg:
+                # 带工具调用的消息：lexilux 现在支持省略 content 字段
+                # 直接传递，不需要添加空的 content
                 formatted_messages.append(msg)
             else:
                 # 用户/助手/系统消息确保内容为字符串
@@ -313,12 +348,19 @@ class WoloLLMClient:
         """获取最后完成的原因."""
         return self._finish_reason
 
-    # Compatibility methods for connection pooling (match original GLMClient interface)
+    # Compatibility methods (match original GLMClient interface)
     @classmethod
     async def close_all_sessions(cls):
-        """Close all pooled sessions (compatibility method)."""
-        # lexilux handles connection pooling automatically
-        logger.debug("Connection cleanup handled by lexilux")
+        """
+        Close all sessions (compatibility method).
+
+        Note: lexilux no longer uses connection pooling. Each HTTP request
+        creates a new connection and closes it after completion. This method
+        is kept for backward compatibility with code that expects GLMClient interface.
+        """
+        # lexilux uses direct HTTP requests (no connection pooling)
+        # No cleanup needed, but keep method for compatibility
+        logger.debug("Connection cleanup not needed (lexilux uses direct HTTP requests)")
 
 
 # ✅ 保持与原 GLMClient 兼容的函数

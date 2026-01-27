@@ -82,10 +82,18 @@ OTHER OPTIONS:
     -n, --max-steps <n>     Max steps (default: 100)
     -L, --log-level <lvl>   DEBUG, INFO, WARNING, ERROR
     -S, --save              Force save session on completion
+    -C, --workdir <path>    Working directory (saved with session)
     --api-key <key>         API key (required if using --baseurl)
 
     If --baseurl is specified, all three (--baseurl, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
+
+OUTPUT OPTIONS:
+    -O, --output-style <s>  Output style: minimal (no color), default, verbose
+    --no-color              Disable color output
+    --show-reasoning        Show model reasoning/thinking
+    --hide-reasoning        Hide model reasoning/thinking
+    --json                  JSON output (implies --output-style=minimal)
 
 DEBUG OPTIONS:
     --debug-llm <file>      Log LLM requests/responses

@@ -3,10 +3,13 @@ CLI utility functions for Wolo.
 """
 
 import sys
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
+
+if TYPE_CHECKING:
+    from wolo.cli.output.base import OutputConfig
 
 
 def show_first_run_message() -> None:
@@ -43,14 +46,21 @@ def get_message_from_sources(args: ParsedArgs) -> tuple[str, bool]:
     return ("", False)
 
 
-def print_session_info(session_id: str, show_resume_hints: bool = True) -> None:
+def print_session_info(
+    session_id: str,
+    show_resume_hints: bool = True,
+    output_config: "OutputConfig | None" = None,
+) -> None:
     """
-    Print session information in a formatted display.
+    Print session information.
 
     Args:
         session_id: Session ID
         show_resume_hints: Whether to show resume command hints
+        output_config: Output configuration for style-specific formatting.
     """
+    from datetime import datetime
+
     from wolo.session import get_session_status, get_storage
 
     status = get_session_status(session_id)
@@ -66,48 +76,33 @@ def print_session_info(session_id: str, show_resume_hints: bool = True) -> None:
     agent_name = status.get("agent_name") or "Unknown"
     created_at = status.get("created_at")
     message_count = status.get("message_count", 0)
-    is_running = status.get("is_running", False)
-    pid = status.get("pid")
 
     # Format created time
     if created_at:
         created_dt = datetime.fromtimestamp(created_at)
         created_str = created_dt.strftime("%Y-%m-%d %H:%M:%S")
-        # Calculate relative time
-        now = datetime.now()
-        delta = now - created_dt
-        if delta.days > 0:
-            relative_str = f"{delta.days} day(s) ago"
-        elif delta.seconds >= 3600:
-            relative_str = f"{delta.seconds // 3600} hour(s) ago"
-        elif delta.seconds >= 60:
-            relative_str = f"{delta.seconds // 60} minute(s) ago"
-        else:
-            relative_str = "just now"
     else:
         created_str = "Unknown"
-        relative_str = "Unknown"
 
-    # Print formatted output
-    print(f"Session: {session_id}")
+    # Get workdir
+    workdir = metadata.get("workdir")
+
+    # Truncate workdir for display
+    if workdir:
+        display_workdir = workdir if len(workdir) <= 45 else "..." + workdir[-42:]
+    else:
+        display_workdir = None
+
+    # Unified banner format for all modes
     print("━" * 60)
+    print(f"  Session:   {session_id}")
     print(f"  Agent:     {agent_name}")
     print(f"  Created:   {created_str}")
     print(f"  Messages:  {message_count}")
-
-    if is_running and pid:
-        print(f"  Status:    \033[92mRunning (PID: {pid})\033[0m")
-    else:
-        print("  Status:    \033[90mStopped\033[0m")
-
-    print()
-    print(f"  Last activity: {relative_str}")
-
-    if show_resume_hints and not is_running:
-        print()
-        print(f"  Resume: wolo session resume {session_id}")
-        print(f'  Or:     wolo -r {session_id} "your prompt"')
-
+    if display_workdir:
+        print(f"  Workdir:   {display_workdir}")
+    if show_resume_hints:
+        print(f'  Resume:    wolo -r {session_id} "your prompt"')
     print("━" * 60)
     print()
 
@@ -126,3 +121,84 @@ def format_duration(seconds: float) -> str:
         return f"{seconds:.1f}s"
     else:
         return f"{int(seconds * 1000)}ms"
+
+
+def check_workdir_match(session_id: str) -> tuple[bool, str | None, str]:
+    """
+    Check if current directory matches session's working directory.
+
+    Args:
+        session_id: Session ID to check
+
+    Returns:
+        (matches, session_workdir, current_workdir)
+        - matches: True if directories match (or session has no workdir)
+        - session_workdir: The session's stored workdir (may be None)
+        - current_workdir: Current working directory
+    """
+    import os
+
+    from wolo.session import get_storage
+
+    storage = get_storage()
+    metadata = storage.get_session_metadata(session_id)
+
+    current_workdir = os.getcwd()
+
+    if not metadata:
+        return (True, None, current_workdir)
+
+    session_workdir = metadata.get("workdir")
+
+    # If no workdir stored, consider it a match (backward compatibility)
+    if session_workdir is None:
+        return (True, None, current_workdir)
+
+    # Normalize paths for comparison
+    session_workdir_norm = os.path.normpath(os.path.abspath(session_workdir))
+    current_workdir_norm = os.path.normpath(os.path.abspath(current_workdir))
+
+    matches = session_workdir_norm == current_workdir_norm
+    return (matches, session_workdir, current_workdir)
+
+
+def handle_keyboard_interrupt(session_id: str) -> int:
+    """
+    Handle KeyboardInterrupt gracefully by saving session.
+
+    Args:
+        session_id: Session ID to save
+
+    Returns:
+        ExitCode.INTERRUPTED
+    """
+    print("\nInterrupted. Saving session...", file=sys.stderr)
+    try:
+        from wolo.session import save_session
+
+        save_session(session_id)
+        print(f"Session saved: {session_id}", file=sys.stderr)
+        print(f'Resume with: wolo -r {session_id} "your prompt"', file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Failed to save session: {e}", file=sys.stderr)
+    return ExitCode.INTERRUPTED
+
+
+def print_workdir_warning(session_workdir: str, current_workdir: str) -> None:
+    """
+    Print a warning about workdir mismatch.
+
+    Args:
+        session_workdir: Session's stored working directory
+        current_workdir: Current working directory
+    """
+    # ANSI colors
+    yellow = "\033[93m"
+    dim = "\033[90m"
+    reset = "\033[0m"
+
+    print(f"{yellow}⚠️  Directory mismatch{reset}")
+    print(f"   Session was created in: {session_workdir}")
+    print(f"   Current directory:      {current_workdir}")
+    print(f"{dim}   (Use -C/--workdir to override, or cd to the original directory){reset}")
+    print()

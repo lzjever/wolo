@@ -3,13 +3,17 @@
 import asyncio
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from wolo.agent import agent_loop
+
+if TYPE_CHECKING:
+    from wolo.cli.output.base import OutputConfig
 from wolo.cli.events import DIM, RESET, set_watch_server
 from wolo.cli.exit_codes import ExitCode
 from wolo.config import Config
 from wolo.control import get_manager, remove_manager
-from wolo.llm import GLMClient
+from wolo.llm_adapter import WoloLLMClient
 from wolo.metrics import MetricsCollector, generate_report
 from wolo.modes import ModeConfig, QuotaConfig
 from wolo.session import (
@@ -32,6 +36,7 @@ async def run_single_task_mode(
     benchmark_mode: bool,
     benchmark_output: str,
     question_handler,
+    output_config: "OutputConfig | None" = None,
 ) -> int:
     """Run a single task in SOLO or COOP mode."""
     # Get or create agent display name from session (persists across runs)
@@ -48,8 +53,16 @@ async def run_single_task_mode(
         control = get_manager(session_id)
         ui, keyboard = create_ui(control)
         # Print shortcuts hint immediately when UI is enabled
-        ui.print_shortcuts()
-        print()
+        # Skip shortcuts in minimal mode (script-friendly)
+        if output_config:
+            from wolo.cli.output import OutputStyle
+
+            if output_config.style != OutputStyle.MINIMAL:
+                ui.print_shortcuts()
+                print()
+        else:
+            ui.print_shortcuts()
+            print()
     else:
         # Silent mode: minimal control manager (no keyboard shortcuts)
         control = get_manager(session_id)
@@ -57,8 +70,10 @@ async def run_single_task_mode(
     # Add user message (no display)
     add_user_message(session_id, message_text)
 
-    # Print agent name prompt
-    print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
+    # Use renderer to display agent start (handles minimal mode correctly)
+    from wolo.cli.events import show_agent_start
+
+    show_agent_start(agent_display_name)
 
     # Start control and keyboard listener (if enabled)
     if control:
@@ -182,8 +197,8 @@ async def run_single_task_mode(
             logger.warning(f"Failed to stop watch server: {e}")
         set_watch_server(None, None)
 
-        # Close HTTP connection pool
-        await GLMClient.close_all_sessions()
+        # Close HTTP connections (compatibility method - lexilux uses direct HTTP, no pooling)
+        await WoloLLMClient.close_all_sessions()
         # Shutdown MCP integration
         try:
             from wolo.mcp_integration import shutdown_mcp
@@ -203,6 +218,7 @@ async def run_repl_mode(
     save_session_flag: bool,
     benchmark_mode: bool,
     benchmark_output: str,
+    output_config: "OutputConfig | None" = None,
 ) -> int:
     """Run REPL mode: continuous conversation loop."""
     # Get or create agent display name from session (persists across runs)
@@ -224,8 +240,16 @@ async def run_repl_mode(
         keyboard.start()
 
         # Print shortcuts hint immediately when entering REPL
-        ui.print_shortcuts()
-        print()
+        # Skip shortcuts in minimal mode (though REPL is typically interactive)
+        if output_config:
+            from wolo.cli.output import OutputStyle
+
+            if output_config.style != OutputStyle.MINIMAL:
+                ui.print_shortcuts()
+                print()
+        else:
+            ui.print_shortcuts()
+            print()
 
         # Setup watch server
         try:
@@ -261,7 +285,10 @@ async def run_repl_mode(
             task_count += 1
 
             # Print agent name prompt
-            print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
+            # Use renderer to display agent start (handles minimal mode correctly)
+            from wolo.cli.events import show_agent_start
+
+            show_agent_start(agent_display_name)
 
             # Start control
             control.start_running()
@@ -332,8 +359,8 @@ async def run_repl_mode(
             logger.warning(f"Failed to stop watch server: {e}")
         set_watch_server(None, None)
 
-        # Close HTTP connection pool
-        await GLMClient.close_all_sessions()
+        # Close HTTP connections (compatibility method - lexilux uses direct HTTP, no pooling)
+        await WoloLLMClient.close_all_sessions()
         # Shutdown MCP integration
         try:
             from wolo.mcp_integration import shutdown_mcp
@@ -393,7 +420,8 @@ async def run_watch_mode(session_id: str) -> int:
     socket_path = Path.home() / ".wolo" / "sessions" / session_id / "watch.sock"
 
     # 显示 session 信息
-    print_session_info(session_id)
+    # Watch mode is interactive, so always show session info (pass None for default behavior)
+    print_session_info(session_id, output_config=None)
     print(f"\033[96mWatching session: {session_id}\033[0m")
     print("Press Ctrl+C to stop watching.\n")
 

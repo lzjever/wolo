@@ -29,6 +29,8 @@ SHORT_OPTIONS = {
     "-m": "--model",
     "-L": "--log-level",
     "-n": "--max-steps",
+    "-O": "--output-style",
+    "-C": "--workdir",
 }
 
 # Options that require values
@@ -53,7 +55,14 @@ OPTIONS_NEEDING_VALUE = {
     "--debug-llm",
     "--debug-full",
     "--benchmark-output",
+    "--output-style",
+    "-O",
+    "--workdir",
+    "-C",
 }
+
+# Valid output style choices
+OUTPUT_STYLE_CHOICES = {"minimal", "default", "verbose"}
 
 # Mutually exclusive option groups
 MUTUALLY_EXCLUSIVE_GROUPS = [
@@ -99,6 +108,14 @@ class ExecutionOptions:
     benchmark_output: str = "benchmark_results.json"
     debug_llm_file: str | None = None
     debug_full_dir: str | None = None
+    # Output style options
+    output_style: str | None = None  # minimal, default, verbose (None = use config)
+    no_color: bool = False
+    no_banner: bool = False  # Suppress session info banner
+    show_reasoning: bool | None = None  # None = use config default
+    json_output: bool = False
+    # Working directory
+    workdir: str | None = None  # Working directory for the session
 
 
 @dataclass
@@ -440,3 +457,28 @@ class FlexibleArgumentParser:
             result.execution_options.debug_full_dir = options.get("--debug-full")
         if "--api-key" in options:
             result.execution_options.api_key = options.get("--api-key")
+
+        # Output style options
+        if "--output-style" in options or "-O" in options:
+            style = options.get("--output-style") or options.get("-O")
+            if style and style in OUTPUT_STYLE_CHOICES:
+                result.execution_options.output_style = style
+        if "--no-color" in options or "no-color" in options:
+            result.execution_options.no_color = True
+        if "--no-banner" in options or "no-banner" in options:
+            result.execution_options.no_banner = True
+        if "--show-reasoning" in options or "show-reasoning" in options:
+            result.execution_options.show_reasoning = True
+        if "--hide-reasoning" in options or "hide-reasoning" in options:
+            result.execution_options.show_reasoning = False
+        if "--json" in options or "json" in options:
+            result.execution_options.json_output = True
+            # JSON implies minimal + no color
+            result.execution_options.output_style = "minimal"
+            result.execution_options.no_color = True
+
+        # Working directory
+        if "--workdir" in options or "-C" in options:
+            workdir = options.get("--workdir") or options.get("-C")
+            if workdir:
+                result.execution_options.workdir = workdir

@@ -265,13 +265,19 @@ class SessionStorage:
 
     # ==================== Session Operations ====================
 
-    def create_session(self, session_id: str | None = None, agent_name: str | None = None) -> str:
+    def create_session(
+        self,
+        session_id: str | None = None,
+        agent_name: str | None = None,
+        workdir: str | None = None,
+    ) -> str:
         """
         Create a new session with immediate persistence.
 
         Args:
             session_id: 手动指定的 session_id，如果为 None 则自动生成
             agent_name: 用于生成 session_id 的 agent 名称，仅在 session_id 为 None 时使用
+            workdir: 工作目录，如果为 None 则使用当前目录
 
         Returns:
             session_id 字符串
@@ -302,6 +308,10 @@ class SessionStorage:
 
             agent_name = get_random_agent_name()
 
+        # Default workdir to current directory if not specified
+        if workdir is None:
+            workdir = os.getcwd()
+
         metadata = {
             "id": session_id,
             "created_at": time.time(),
@@ -313,6 +323,7 @@ class SessionStorage:
             "agent_display_name": agent_name,  # Store the agent name
             "pid": None,  # 新增：当前运行进程的 PID
             "pid_updated_at": None,  # 新增：PID 更新时间
+            "workdir": workdir,  # 工作目录
         }
         self._write_json(self._session_file(session_id), metadata)
         logger.debug(f"Created session {session_id[:8]}...")
@@ -554,10 +565,10 @@ class SessionStorage:
         self._session_dir(session.id).mkdir(parents=True, exist_ok=True)
         self._messages_dir(session.id).mkdir(exist_ok=True)
 
-        # Get existing metadata to preserve agent_display_name
+        # Get existing metadata to preserve fields not in Session dataclass
         existing_metadata = self.get_session_metadata(session.id) or {}
 
-        # Save metadata
+        # Save metadata - preserve existing fields that aren't in Session dataclass
         metadata = {
             "id": session.id,
             "created_at": session.created_at,
@@ -566,9 +577,11 @@ class SessionStorage:
             "agent_type": session.agent_type,
             "title": session.title,
             "tags": session.tags,
-            "agent_display_name": existing_metadata.get(
-                "agent_display_name"
-            ),  # Preserve agent_display_name
+            # Preserve fields from existing metadata
+            "agent_display_name": existing_metadata.get("agent_display_name"),
+            "pid": existing_metadata.get("pid"),
+            "pid_updated_at": existing_metadata.get("pid_updated_at"),
+            "workdir": existing_metadata.get("workdir"),
         }
         self._write_json(self._session_file(session.id), metadata)
 
@@ -776,13 +789,16 @@ def _deserialize_message(data: dict[str, Any]) -> Message:
 # ==================== Public API (Backward Compatible) ====================
 
 
-def create_session(session_id: str | None = None, agent_name: str | None = None) -> str:
+def create_session(
+    session_id: str | None = None, agent_name: str | None = None, workdir: str | None = None
+) -> str:
     """
     Create a new session.
 
     Args:
         session_id: 手动指定的 session_id，如果为 None 则自动生成
         agent_name: 用于生成 session_id 的 agent 名称，仅在 session_id 为 None 时使用
+        workdir: 工作目录，如果为 None 则使用当前目录
 
     Returns:
         session_id 字符串
@@ -791,7 +807,9 @@ def create_session(session_id: str | None = None, agent_name: str | None = None)
         ValueError: 如果指定的 session_id 已存在
     """
     storage = get_storage()
-    session_id = storage.create_session(session_id=session_id, agent_name=agent_name)
+    session_id = storage.create_session(
+        session_id=session_id, agent_name=agent_name, workdir=workdir
+    )
 
     # Also create in-memory
     _sessions[session_id] = Session(id=session_id)
@@ -932,6 +950,8 @@ def to_llm_messages(messages: list[Message]) -> list[dict[str, Any]]:
                     )
 
             msg_data = {"role": "assistant"}
+            # Only include content if there's actual text content
+            # (OpenAI API allows omitting content when only tool_calls are present)
             if text_content:
                 msg_data["content"] = text_content
             if tool_calls:

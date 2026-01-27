@@ -41,6 +41,12 @@ def _suppress_mcp_shutdown_errors(loop, context):
             logger.debug(f"Suppressing expected cleanup error: {exc_str}")
             return
 
+        # Suppress "Event loop is closed" errors from subprocess cleanup
+        # This happens when subprocess transports try to clean up after the loop is closed
+        if isinstance(exc, RuntimeError) and "Event loop is closed" in exc_str:
+            logger.debug(f"Suppressing expected subprocess cleanup error: {exc_str}")
+            return
+
         # Check for BaseExceptionGroup (Python 3.11+)
         if isinstance(exc, BaseExceptionGroup):
             # Check if all exceptions in the group are expected shutdown errors
@@ -50,6 +56,7 @@ def _suppress_mcp_shutdown_errors(loop, context):
                 if not (
                     "cancel scope" in sub_exc_str
                     or "dictionary changed" in sub_exc_str
+                    or "Event loop is closed" in sub_exc_str
                     or "stdio_client" in sub_exc_str
                     or "streamable_http_client" in sub_exc_str
                     or "streamablehttp_client" in sub_exc_str
@@ -78,12 +85,14 @@ def _suppress_mcp_shutdown_errors(loop, context):
         "shutdown" in msg.lower()
         or "closing" in msg.lower()
         or "unhandled exception" in msg.lower()
+        or "Event loop is closed" in msg
     ):
         if exc:
             exc_str = str(exc)
             if (
                 "cancel scope" in exc_str
                 or "dictionary changed" in exc_str
+                or "Event loop is closed" in exc_str
                 or "stdio_client" in exc_str
                 or "streamable_http_client" in exc_str
                 or "streamablehttp_client" in exc_str
@@ -119,6 +128,18 @@ def safe_async_run(coro: Awaitable[T]) -> T:
 
         # Run the coroutine
         return loop.run_until_complete(coro)
+    except KeyboardInterrupt:
+        # Re-raise KeyboardInterrupt so caller can handle it (e.g., save session)
+        # Cancel pending tasks first
+        try:
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass  # Ignore errors during cleanup
+        raise  # Re-raise KeyboardInterrupt
     finally:
         try:
             # Cancel all pending tasks
@@ -129,11 +150,30 @@ def safe_async_run(coro: Awaitable[T]) -> T:
             # Wait for tasks to complete cancellation
             if pending:
                 loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except (Exception, KeyboardInterrupt) as e:
-            # Suppress errors during cleanup, including keyboard interrupt
+
+            # Cleanup all subprocesses before shutting down the event loop
+            # This prevents "Event loop is closed" errors from subprocess transports
+            try:
+                from wolo.subprocess_manager import cleanup_all_subprocesses
+
+                loop.run_until_complete(cleanup_all_subprocesses(timeout=2.0))
+            except Exception as e:
+                logger.debug(f"Error during subprocess cleanup: {e}")
+
+            # Shutdown async generators and default executor to ensure proper cleanup
+            try:
+                if hasattr(loop, "shutdown_asyncgens"):
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                if hasattr(loop, "shutdown_default_executor"):
+                    loop.run_until_complete(loop.shutdown_default_executor())
+            except Exception:
+                pass  # Ignore shutdown errors
+        except Exception as e:
+            # Suppress errors during cleanup (but not KeyboardInterrupt - already handled above)
             logger.debug(f"Error during cleanup (suppressed): {e}")
         finally:
             try:
+                # Close the loop - this will trigger cleanup of all transports
                 loop.close()
             except Exception:
                 pass  # Ignore errors during loop close

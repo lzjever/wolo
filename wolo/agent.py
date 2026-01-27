@@ -622,6 +622,25 @@ async def process_event(
         current_text_part.text += text
         await bus.publish("text-delta", {"text": text})
 
+    elif event_type == "tool-call-streaming":
+        # LLM started streaming a tool call - show early feedback
+        tool_name = event.get("tool", "")
+        tool_id = event.get("id", "")
+        length = event.get("length", 0)
+        await bus.publish(
+            "tool-call-streaming",
+            {"tool": tool_name, "id": tool_id, "length": length},
+        )
+
+    elif event_type == "tool-call-progress":
+        # LLM is generating tool call arguments - show progress
+        index = event.get("index", 0)
+        length = event.get("length", 0)
+        await bus.publish(
+            "tool-call-progress",
+            {"index": index, "length": length},
+        )
+
     elif event_type == "tool-call":
         tool_name = event.get("tool", "")
         tool_input = event.get("input", {})

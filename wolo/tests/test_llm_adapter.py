@@ -30,7 +30,7 @@ async def test_wolo_llm_client_initialization(mock_config):
         config=mock_config, session_id="test-session", agent_display_name="TestAgent"
     )
 
-    assert client._enable_think is True
+    assert client.enable_think is True
     assert client._session_id == "test-session"
     assert client.model == "test-model"
     assert client.temperature == 0.7

@@ -19,10 +19,9 @@ Examples:
     python3 scripts/generate_release_notes.py 0.1.1 release_notes.md
 """
 
-import sys
 import os
 import subprocess
-from pathlib import Path
+import sys
 
 
 def get_changelog_section(version, changelog_path="CHANGELOG.md"):
@@ -39,7 +38,7 @@ def get_changelog_section(version, changelog_path="CHANGELOG.md"):
     if not os.path.exists(changelog_path):
         return None
 
-    with open(changelog_path, 'r', encoding='utf-8') as f:
+    with open(changelog_path, encoding='utf-8') as f:
         lines = f.readlines()
 
     start_pattern = f"## [{version}]"

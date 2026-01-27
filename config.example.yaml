@@ -105,6 +105,30 @@ mcp:
 enable_think: false  # Set to true to enable thinking mode
 
 # ----------------------------------------------------------------------------
+# Output Configuration
+# ----------------------------------------------------------------------------
+# Configure how Wolo displays output.
+
+output:
+  # Output style
+  # - minimal: Script-friendly, no colors, structured summary
+  # - default: Standard interactive output with colors and icons
+  # - verbose: Detailed output with diffs, full command output, etc.
+  style: default
+  
+  # Show model reasoning/thinking output (if available)
+  show_reasoning: true
+  
+  # Show timestamps in output
+  show_timestamps: false
+  
+  # Maximum lines to show for tool output (in verbose mode)
+  max_output_lines: 20
+  
+  # Context lines to show in diffs
+  diff_context_lines: 3
+
+# ----------------------------------------------------------------------------
 # History Compaction
 # ----------------------------------------------------------------------------
 # Configure how Wolo manages long conversation histories.

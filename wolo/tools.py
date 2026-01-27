@@ -195,67 +195,68 @@ async def shell_execute(command: str, timeout: int = 30000) -> dict[str, Any]:
     }
     _running_shells[shell_id] = shell_info
 
-    process = await asyncio.create_subprocess_shell(
+    from wolo.subprocess_manager import managed_subprocess
+
+    async with managed_subprocess(
         command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, shell=True
-    )
+    ) as process:
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout / 1000)
 
-    try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout / 1000)
+            output = stdout.decode("utf-8", errors="replace")
+            error = stderr.decode("utf-8", errors="replace")
 
-        output = stdout.decode("utf-8", errors="replace")
-        error = stderr.decode("utf-8", errors="replace")
+            if error:
+                output = output + "\n" + error if output else error
 
-        if error:
-            output = output + "\n" + error if output else error
+            # Store output (limited lines)
+            lines = output.split("\n")
+            shell_info["output_lines"] = (
+                lines[-_MAX_OUTPUT_LINES:] if len(lines) > _MAX_OUTPUT_LINES else lines
+            )
+            shell_info["status"] = "completed"
+            shell_info["exit_code"] = process.returncode
+            shell_info["end_time"] = time.time()
+            shell_info["duration"] = shell_info["end_time"] - start_time
 
-        # Store output (limited lines)
-        lines = output.split("\n")
-        shell_info["output_lines"] = (
-            lines[-_MAX_OUTPUT_LINES:] if len(lines) > _MAX_OUTPUT_LINES else lines
-        )
-        shell_info["status"] = "completed"
-        shell_info["exit_code"] = process.returncode
-        shell_info["end_time"] = time.time()
-        shell_info["duration"] = shell_info["end_time"] - start_time
+            # Move to history
+            del _running_shells[shell_id]
+            _shell_history.insert(0, shell_info)
+            if len(_shell_history) > _MAX_SHELL_HISTORY:
+                _shell_history.pop()
 
-        # Move to history
-        del _running_shells[shell_id]
-        _shell_history.insert(0, shell_info)
-        if len(_shell_history) > _MAX_SHELL_HISTORY:
-            _shell_history.pop()
+            # Truncate output if too large
+            truncated = truncate_output(output)
 
-        # Truncate output if too large
-        truncated = truncate_output(output)
+            return {
+                "title": command,
+                "output": truncated.content,
+                "metadata": {
+                    "exit_code": process.returncode,
+                    "shell_id": shell_id,
+                    "truncated": truncated.truncated,
+                    "saved_path": truncated.saved_path,
+                },
+            }
+        except TimeoutError:
+            process.kill()
+            await process.wait()
 
-        return {
-            "title": command,
-            "output": truncated.content,
-            "metadata": {
-                "exit_code": process.returncode,
-                "shell_id": shell_id,
-                "truncated": truncated.truncated,
-                "saved_path": truncated.saved_path,
-            },
-        }
-    except TimeoutError:
-        process.kill()
-        await process.wait()
+            shell_info["status"] = "timeout"
+            shell_info["exit_code"] = -1
+            shell_info["end_time"] = time.time()
+            shell_info["duration"] = shell_info["end_time"] - start_time
 
-        shell_info["status"] = "timeout"
-        shell_info["exit_code"] = -1
-        shell_info["end_time"] = time.time()
-        shell_info["duration"] = shell_info["end_time"] - start_time
+            del _running_shells[shell_id]
+            _shell_history.insert(0, shell_info)
+            if len(_shell_history) > _MAX_SHELL_HISTORY:
+                _shell_history.pop()
 
-        del _running_shells[shell_id]
-        _shell_history.insert(0, shell_info)
-        if len(_shell_history) > _MAX_SHELL_HISTORY:
-            _shell_history.pop()
-
-        return {
-            "title": command,
-            "output": f"Command timed out after {timeout}ms",
-            "metadata": {"exit_code": -1, "shell_id": shell_id},
-        }
+            return {
+                "title": command,
+                "output": f"Command timed out after {timeout}ms",
+                "metadata": {"exit_code": -1, "shell_id": shell_id},
+            }
 
 
 def get_shell_status() -> dict:
@@ -655,65 +656,67 @@ async def grep_execute(
 
             cmd_parts.append(str(search_path))
 
-            process = await asyncio.create_subprocess_exec(
+            from wolo.subprocess_manager import managed_subprocess
+
+            async with managed_subprocess(
                 *cmd_parts, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
+            ) as process:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
 
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+                output = stdout.decode("utf-8", errors="replace")
 
-            output = stdout.decode("utf-8", errors="replace")
+                # Parse results and sort by modification time
+                matches = []
+                for line in output.strip().split("\n"):
+                    if not line:
+                        continue
+                    parts = line.split("|", 2)
+                    if len(parts) >= 3:
+                        file_path_str, line_num, content = parts
+                        try:
+                            mtime = Path(file_path_str).stat().st_mtime
+                        except OSError:
+                            mtime = 0
+                        matches.append(
+                            {
+                                "path": file_path_str,
+                                "line": int(line_num) if line_num.isdigit() else 0,
+                                "content": content[:200],  # Limit line length
+                                "mtime": mtime,
+                            }
+                        )
 
-            # Parse results and sort by modification time
-            matches = []
-            for line in output.strip().split("\n"):
-                if not line:
-                    continue
-                parts = line.split("|", 2)
-                if len(parts) >= 3:
-                    file_path_str, line_num, content = parts
-                    try:
-                        mtime = Path(file_path_str).stat().st_mtime
-                    except OSError:
-                        mtime = 0
-                    matches.append(
-                        {
-                            "path": file_path_str,
-                            "line": int(line_num) if line_num.isdigit() else 0,
-                            "content": content[:200],  # Limit line length
-                            "mtime": mtime,
-                        }
-                    )
+                # Sort by modification time (newest first)
+                matches.sort(key=lambda x: x["mtime"], reverse=True)
 
-            # Sort by modification time (newest first)
-            matches.sort(key=lambda x: x["mtime"], reverse=True)
+                # Limit results
+                max_results = 100
+                truncated_results = len(matches) > max_results
+                matches = matches[:max_results]
 
-            # Limit results
-            max_results = 100
-            truncated_results = len(matches) > max_results
-            matches = matches[:max_results]
+                if not matches:
+                    return {
+                        "title": f"grep: {pattern}",
+                        "output": f"No matches found for pattern: {pattern}",
+                        "metadata": {"matches": 0},
+                    }
 
-            if not matches:
-                return {
-                    "title": f"grep: {pattern}",
-                    "output": f"No matches found for pattern: {pattern}",
-                    "metadata": {"matches": 0},
-                }
+                # Format output
+                output_lines = [f"Found {len(matches)} matches (sorted by modification time):"]
+                current_file = ""
+                for m in matches:
+                    if m["path"] != current_file:
+                        if current_file:
+                            output_lines.append("")
+                        current_file = m["path"]
+                        output_lines.append(f"\n{m['path']}:")
+                    output_lines.append(f"  Line {m['line']}: {m['content']}")
 
-            # Format output
-            output_lines = [f"Found {len(matches)} matches (sorted by modification time):"]
-            current_file = ""
-            for m in matches:
-                if m["path"] != current_file:
-                    if current_file:
-                        output_lines.append("")
-                    current_file = m["path"]
-                    output_lines.append(f"\n{m['path']}:")
-                output_lines.append(f"  Line {m['line']}: {m['content']}")
+                if truncated_results:
+                    output_lines.append("\n(Results truncated. Use a more specific pattern.)")
 
-            if truncated_results:
-                output_lines.append("\n(Results truncated. Use a more specific pattern.)")
-
-            result_output = "\n".join(output_lines)
+                result_output = "\n".join(output_lines)
+                match_count = len(matches)
 
         else:
             # Fallback to system grep
@@ -722,22 +725,23 @@ async def grep_execute(
             if include_pattern:
                 cmd_parts.extend(["--include", include_pattern])
 
-            process = await asyncio.create_subprocess_exec(
+            from wolo.subprocess_manager import managed_subprocess
+
+            async with managed_subprocess(
                 *cmd_parts, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
+            ) as process:
+                stdout, stderr = await process.communicate()
+                output = stdout.decode("utf-8", errors="replace")
 
-            stdout, stderr = await process.communicate()
-            output = stdout.decode("utf-8", errors="replace")
+                if process.returncode != 0 and not output:
+                    return {
+                        "title": f"grep: {pattern}",
+                        "output": f"No matches found for pattern: {pattern}",
+                        "metadata": {"matches": 0},
+                    }
 
-            if process.returncode != 0 and not output:
-                return {
-                    "title": f"grep: {pattern}",
-                    "output": f"No matches found for pattern: {pattern}",
-                    "metadata": {"matches": 0},
-                }
-
-            match_count = len(output.strip().split("\n")) if output.strip() else 0
-            result_output = output
+                match_count = len(output.strip().split("\n")) if output.strip() else 0
+                result_output = output
 
         # Truncate if too large
         truncated = truncate_output(result_output)
@@ -746,7 +750,7 @@ async def grep_execute(
             "title": f"grep: {pattern}",
             "output": truncated.content,
             "metadata": {
-                "matches": len(matches) if rg_path else match_count,
+                "matches": match_count,
                 "truncated": truncated.truncated,
                 "using_ripgrep": bool(rg_path),
             },
@@ -1061,6 +1065,11 @@ async def execute_tool(
             result = await shell_execute(command, timeout)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display
+            tool_part._metadata = {
+                "command": command,
+                "exit_code": result.get("metadata", {}).get("exit_code", 0),
+            }
 
         elif tool_part.tool == "read":
             file_path = tool_part.input.get("file_path", "")
@@ -1069,6 +1078,13 @@ async def execute_tool(
             result = await read_execute(file_path, offset, limit)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display
+            tool_part._metadata = {
+                "file_path": file_path,
+                "total_lines": result.get("metadata", {}).get("total_lines", 0),
+                "offset": offset,
+                "showing_lines": result.get("metadata", {}).get("showing_lines", 0),
+            }
 
             # Track file read time for modification detection
             if session_id and result["metadata"].get("error") is None:
@@ -1094,6 +1110,14 @@ async def execute_tool(
             result = await write_execute(file_path, content)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display
+            lines = content.count("\n") + 1
+            tool_part._metadata = {
+                "file_path": file_path,
+                "additions": lines,
+                "deletions": 0,
+                "size": len(content),
+            }
 
             # Update file time after write
             if session_id:
@@ -1120,6 +1144,13 @@ async def execute_tool(
             result = await edit_execute(file_path, old_text, new_text)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display (including diff)
+            tool_part._metadata = {
+                "file_path": file_path,
+                "additions": result.get("metadata", {}).get("additions", 0),
+                "deletions": result.get("metadata", {}).get("deletions", 0),
+                "diff": result.get("metadata", {}).get("diff", ""),
+            }
 
             # Update file time after edit
             if session_id and result["metadata"].get("error") is None:
@@ -1138,6 +1169,12 @@ async def execute_tool(
             result = await grep_execute(pattern, path, include_pattern)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display
+            tool_part._metadata = {
+                "pattern": pattern,
+                "path": path,
+                "matches": result.get("metadata", {}).get("matches", 0),
+            }
 
         elif tool_part.tool == "glob":
             pattern = tool_part.input.get("pattern", "")
@@ -1145,6 +1182,12 @@ async def execute_tool(
             result = await glob_execute(pattern, path)
             tool_part.output = result["output"]
             tool_part.status = "completed"
+            # Store metadata for verbose display
+            tool_part._metadata = {
+                "pattern": pattern,
+                "path": path,
+                "matches": result.get("metadata", {}).get("matches", 0),
+            }
 
         elif tool_part.tool.startswith("mcp_"):
             # Handle MCP server tools
@@ -1212,6 +1255,12 @@ async def execute_tool(
 
                 tool_part.output = "\n".join(output_lines)
                 tool_part.status = "completed"
+                # Store metadata for verbose display
+                tool_part._metadata = {
+                    "todos": todos,
+                    "total": len(todos),
+                    "completed": len(completed),
+                }
 
         elif tool_part.tool == "todoread":
             sid = tool_part.input.get("session_id") or session_id
@@ -1389,8 +1438,11 @@ async def execute_tool(
     tool_part.end_time = time.time()
     duration = tool_part.end_time - tool_part.start_time
 
+    # Collect metadata for display (used by verbose mode)
+    tool_metadata = getattr(tool_part, "_metadata", {})
+
     # Use registry for tool-complete event
     complete_event = registry.format_tool_complete(
-        tool_part.tool, tool_part.output, tool_part.status, duration
+        tool_part.tool, tool_part.output, tool_part.status, duration, tool_metadata
     )
     await bus.publish("tool-complete", complete_event)

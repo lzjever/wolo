@@ -12,7 +12,7 @@ from wolo.cli.async_utils import safe_async_run
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
-from wolo.cli.utils import get_message_from_sources
+from wolo.cli.utils import get_message_from_sources, handle_keyboard_interrupt
 from wolo.modes import ExecutionMode
 
 
@@ -172,27 +172,49 @@ class RunCommand(BaseCommand):
             except (FileNotFoundError, ValueError) as e:
                 print(f"Error: {e}", file=sys.stderr)
                 return ExitCode.SESSION_ERROR
+
+            # Check workdir match (warning only, don't block)
+            from wolo.cli.utils import check_workdir_match, print_workdir_warning
+
+            matches, session_workdir, current_workdir = check_workdir_match(session_id)
+            if not matches and session_workdir:
+                print_workdir_warning(session_workdir, current_workdir)
+
         elif args.session_options.session_name is not None:
             # Create named session
             session_name = args.session_options.session_name
+            workdir = args.execution_options.workdir  # May be None (defaults to cwd)
             if session_name == "":
                 # Auto-generate name
                 agent_name = get_random_agent_name()
-                session_id = create_session(agent_name=agent_name)
+                session_id = create_session(agent_name=agent_name, workdir=workdir)
             else:
-                session_id = create_session(session_id=session_name)
+                session_id = create_session(session_id=session_name, workdir=workdir)
             check_and_set_session_pid(session_id)
         else:
             # Auto-generate session
             agent_name = get_random_agent_name()
-            session_id = create_session(agent_name=agent_name)
+            workdir = args.execution_options.workdir  # May be None (defaults to cwd)
+            session_id = create_session(agent_name=agent_name, workdir=workdir)
             check_and_set_session_pid(session_id)
 
-        # Print session info (without resume hints since we're running)
-        print_session_info(session_id, show_resume_hints=False)
+        # Setup output configuration first (needed for print_session_info)
+        from wolo.cli.output import OutputConfig
+
+        output_config = OutputConfig.from_args_and_config(
+            output_style=args.execution_options.output_style,
+            no_color=args.execution_options.no_color,
+            show_reasoning=args.execution_options.show_reasoning,
+            json_output=args.execution_options.json_output,
+            config_data=Config._load_config_file(),
+        )
+
+        # Print session info banner (unless --no-banner)
+        if not args.execution_options.no_banner:
+            print_session_info(session_id, show_resume_hints=False, output_config=output_config)
 
         # Setup event handlers
-        setup_event_handlers()
+        setup_event_handlers(output_config)
 
         # Setup MCP if needed
         async def setup_mcp():
@@ -221,10 +243,13 @@ class RunCommand(BaseCommand):
                 args.execution_options.benchmark_mode,
                 args.execution_options.benchmark_output,
                 question_handler,
+                output_config,  # Pass output_config for minimal mode check
             )
 
         try:
             return safe_async_run(run_task())
+        except KeyboardInterrupt:
+            return handle_keyboard_interrupt(session_id)
         except RuntimeError:
             # Event loop already running, try to get it
             try:
@@ -242,6 +267,11 @@ class RunCommand(BaseCommand):
 
                     loop.set_exception_handler(_suppress_mcp_shutdown_errors)
                     return loop.run_until_complete(run_task())
+            except KeyboardInterrupt:
+                return handle_keyboard_interrupt(session_id)
             except Exception:
                 # Fallback: use safe_async_run which creates a new loop
-                return safe_async_run(run_task())
+                try:
+                    return safe_async_run(run_task())
+                except KeyboardInterrupt:
+                    return handle_keyboard_interrupt(session_id)

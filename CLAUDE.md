@@ -2,209 +2,152 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-**Wolo** is a minimal Python AI agent that implements an agent loop with comprehensive tool support, streaming responses, and session management. It uses the GLM API (similar to Claude's architecture) and supports MCP (Model Context Protocol) servers for extensibility.
-
 ## Development Commands
-
-This project uses [uv](https://github.com/astral-sh/uv) for fast dependency management. If `uv` is not available, commands fall back to pip.
 
 ```bash
 # Installation
-make dev-install          # Install with all development dependencies
+uv sync                    # Install dependencies
+pip install -e .           # Fallback if uv unavailable
 
 # Running
-uv run wolo "message"     # Run agent with a message
-make run MSG="msg"        # Alternative using Make
-uv run wolo --agent plan "Design X"  # Use specific agent type
-uv run wolo --resume <session-id> "Continue"  # Resume saved session
+wolo "your prompt"         # Execute a task
+wolo chat                  # Start interactive REPL
+wolo -r <session-id>       # Resume a session
+
+# Configuration
+wolo config init           # First-time setup wizard
+wolo config show           # Show current configuration
+wolo config docs           # Show configuration documentation
 
 # Testing
-make test                 # Run all unit tests
-make test-cov             # Run with coverage report
-pytest wolo/tests/test_specific.py -v  # Run single test file
+pytest                     # Run tests (auto-detects pytest-asyncio)
+pytest -n auto             # Run tests in parallel (pytest-xdist)
+pytest tests/test_file.py  # Run specific test file
+pytest -k "test_name"      # Run tests matching pattern
+pytest --cov=wolo          # Run with coverage
 
 # Code Quality
-make lint                 # Run linting checks (ruff)
-make format               # Format code with ruff
-make format-check         # Check code formatting
-make check                # Run all checks (lint + format + test)
-
-# Building
-make build                # Build source and wheel distributions
+ruff check .               # Lint
+ruff format .              # Format
+ruff check --fix .         # Auto-fix lint issues
 ```
 
-## Configuration
+## High-Level Architecture
 
-The GLM API key must be set:
+### Core Components
 
-```bash
-export GLM_API_KEY="your-api-key"
-```
+**Agent Loop** (`wolo/agent.py`)
+- Main execution loop: `agent_loop()` - runs LLM calls, handles tool execution, checks for completion
+- Doom loop detection: prevents infinite loops by detecting repeated tool calls with identical input
+- Step boundary handling: supports pause/resume via `ControlManager`
+- Dynamic client selection: chooses between legacy `GLMClient` and lexilux-based `WoloLLMClient` based on `config.use_lexilux_client`
 
-Configuration is loaded from `~/.wolo/config.yaml` (supports multiple endpoints, MCP servers, compaction settings). See `config.example.yaml` for reference.
+**Session Management** (`wolo/session.py`)
+- Layered storage: `session.json` (metadata) + `messages/*.json` (individual messages) + `todos.json`
+- Session ID format: `{AgentName}_{YYMMDD}_{HHMMSS}`
+- `SessionSaver`: debounced auto-save (0.5s min interval) with immediate persistence
+- PID tracking: detects if session is already running in another process
 
-## Architecture
+**Tool System** (`wolo/tools.py`, `wolo/tool_registry.py`)
+- Tools registered via `ToolSpec` in registry
+- Built-in tools: `read`, `write`, `edit`, `multiedit`, `grep`, `glob`, `ls`, `shell`, `batch`, `task`, `question`, `todowrite`, `todoread`, `skill`
+- File modification tracking via `FileTime`: prevents editing files that changed externally since last read
+- MCP tools prefixed with `mcp_` and loaded dynamically
 
-### Core Agent Loop (`wolo/agent.py`)
+**LLM Client Architecture**
+- Legacy client: `wolo/llm.py` - GLM-specific implementation (deprecated)
+- New client: `wolo/llm_adapter.py` - `WoloLLMClient` using lexilux library
+- Selection: controlled by `config.use_lexilux_client` flag or `WOLO_USE_LEXILUX_CLIENT` env var
+- Lexilux client supports all OpenAI-compatible models (OpenAI, Anthropic, DeepSeek, etc.)
 
-The `agent_loop()` function is the heart of Wolo. Key flow:
-
-1. **Step boundary control** - Handles user interruption/checkpoints at each step
-2. **Pending tool execution** - Executes tools from previous LLM response
-3. **Exit conditions** - Checks if task is complete (todos, finish_reason, max_steps)
-4. **LLM call** - Streams response with tool calls
-5. **Metrics recording** - Tracks tokens, latency, tool usage
-
-**Doom loop detection**: The agent detects when the same tool is called repeatedly with identical input (5x threshold) and stops to prevent infinite loops.
-
-### Message Compaction (`wolo/compaction/`)
-
-Token-efficient context management through automatic message summarization:
-
-- `manager.py`: `CompactionManager` - decides when to compact and orchestrates policies
-- `history.py`: Policies for removing/summarizing messages (roundtrip, head, tail)
-- `token.py`: `TokenEstimator` - estimates token counts for messages
-
-Compaction is triggered automatically based on token thresholds configured in `~/.wolo/config.yaml`.
-
-### Agent Types (`wolo/agents.py`)
-
-Four agent types with different permission levels:
-
-| Agent | Permissions | Use Case |
-|-------|-------------|----------|
-| `general` | All tools | Full coding tasks |
-| `plan` | Read + shell (exploration only) | Design/planning |
-| `explore` | Read-only | Codebase analysis |
-| `compaction` | Read-only | Context summarization |
-
-Permissions are checked in `execute_tool()` via `check_permission()`.
-
-### Tools (`wolo/tools.py`)
-
-Tools are defined via a registry system in `tool_registry.py`. Built-in tools include:
-
-- **File ops**: `read` (supports images/PDFs), `write`, `edit`, `multiedit`
-- **Search**: `grep` (ripgrep fallback), `glob`
-- **Execution**: `shell`, `task` (spawn subagents)
-- **Utilities**: `file_exists`, `get_env`, `todowrite`, `todoread`, `question`, `batch`, `skill`
-
-**File modification tracking**: The `file_time.py` module tracks when files are read and prevents writes/edits if a file was externally modified since last read (raises `FileModifiedError`).
-
-**Output truncation**: Large tool outputs are automatically truncated and saved to `.wolo_cache/truncated_outputs/` to stay within token limits.
-
-### Session Management (`wolo/session.py`)
-
-Layered storage architecture for crash resilience:
-
-- `~/.wolo/sessions/{session_id}/session.json` - Metadata
-- `~/.wolo/sessions/{session_id}/messages/*.json` - Individual messages
-- `~/.wolo/sessions/{session_id}/todos.json` - Todo state
-
-Session ID format: `{AgentName}_{YYMMDD}_{HHMMSS}`
-
-**Auto-save**: `SessionSaver` provides debounced auto-save after each LLM response and tool completion.
-
-### MCP Integration (`wolo/mcp_integration.py`)
-
-Integrates with Claude Desktop configuration and MCP servers:
-
-- Loads skills from `~/.claude/custom_skills/`
-- Loads MCP servers from `~/.claude/claude_desktop_config.json` or `~/.wolo/config.yaml`
+**MCP Integration** (`wolo/mcp_integration.py`, `wolo/mcp/`)
+- Loads MCP servers from Claude Desktop config (`~/.claude/claude_desktop_config.json`) or Wolo config
 - Supports local (stdio) and remote (HTTP/SSE) servers
-- Node.js strategy: `auto`, `require`, `skip`, `python_fallback`
+- Skills loaded from `~/.wolo/skills/` and optionally `~/.claude/custom_skills/`
+- Background initialization: servers start asynchronously, tools registered as they connect
 
-MCP tools are prefixed with `mcp_` and added to the tool registry.
+**Message Compaction** (`wolo/compaction/`)
+- `CompactionManager`: orchestrates compaction policies
+- Policies: `ToolOutputPruningPolicy` (truncates tool outputs), `SummaryCompactionPolicy` (LLM summarization)
+- Token estimation via `TokenEstimator`
+- Compaction history tracked per session
 
-### Streaming LLM Client (`wolo/llm.py`)
+**Agent Types** (`wolo/agents.py`)
+- `general`: Full tool access for coding tasks
+- `plan`: Read-only tools for planning/design
+- `explore`: Read-only for codebase analysis
+- Permission checks: `deny`, `ask`, `allow` per tool per agent type
 
-`GLMClient` provides streaming chat completion with:
+### CLI Architecture (`wolo/cli/`)
 
-- Connection pooling via `aiohttp.ClientSession`
-- GLM "thinking mode" support (`enable_think`)
-- Request/response debugging via `debug_llm_file` or `debug_full_dir`
-- Retry logic with exponential backoff
-- User-Agent header mimicking opencode
+**Command Routing** (`main.py`)
+- STRICT ROUTING PRIORITY (do not modify order):
+  1. Help: `-h`, `--help`
+  2. Quick commands: `-l` (list), `-w` (watch)
+  3. Subcommands: `session`, `config`, `debug`
+  4. REPL entry: `chat`, `repl`
+  5. Execution: prompt provided (CLI or stdin)
+  6. Default: brief help
 
-Events emitted: `reasoning-delta`, `text-delta`, `tool-call`, `finish`
+**Parser** (`parser.py`)
+- `FlexibleArgumentParser`: handles mixed options and positional arguments
+- Stdin detection: reads piped input
+- Option conflict validation
 
-### Metrics & Benchmarking (`wolo/metrics.py`)
+### Configuration (`wolo/config.py`)
 
-`MetricsCollector` tracks per-session and per-step metrics:
+- Primary config file: `~/.wolo/config.yaml`
+- Environment variables: `GLM_API_KEY`, `WOLO_MODEL`, `WOLO_API_BASE`
+- Direct mode: `--baseurl` + `--api-key` + `--model` bypasses config file
+- Modular configs: `ClaudeCompatConfig`, `MCPConfig`, `CompactionConfig`
+- Lexilux flag: `use_lexilux_client` in config or `WOLO_USE_LEXILUX_CLIENT` env var
 
-- Steps, duration, tokens, LLM calls
-- Tool usage counts and errors
-- Subagent session tracking
+## Key Patterns and Conventions
 
-Run `uv run wolo --benchmark "task"` or `uv run python -m wolo.tests.benchmark` for benchmarking.
+### Tool Implementation Pattern
+```python
+async def mytool_execute(param: str) -> dict[str, Any]:
+    """Execute tool and return result."""
+    try:
+        # Do work
+        return {
+            "title": "mytool: ...",
+            "output": "...",
+            "metadata": {...}
+        }
+    except Exception as e:
+        return {
+            "title": "mytool: ...",
+            "output": f"Error: {e}",
+            "metadata": {"error": str(e)}
+        }
+```
 
-### Control Flow (`wolo/control.py`)
+### File Operations
+- **ALWAYS** use `Read` tool before `Edit`/`Write` for file modification tracking
+- `FileTime.assert_not_modified()` raises `FileModifiedError` if file changed externally
+- Large outputs truncated to `.wolo_cache/truncated_outputs/` via `truncate_output()`
 
-`ControlManager` handles interactive control:
-
-- Pause/resume execution
-- User interruption (Ctrl+C)
-- Step boundary checkpoints
+### Session Resume Flow
+1. Check PID: `check_and_set_session_pid()` - fails if already running
+2. Load messages: `get_session_messages()`
+3. Load todos: `load_session_todos()`
+4. Run `agent_loop()` with `is_repl_mode=True` for REPL, `False` for single-shot
 
 ### Event System (`wolo/events.py`)
+- `bus.publish()` for events: `text-delta`, `tool-start`, `tool-complete`, `finish`
+- Used by UI/watch server for real-time updates
 
-Simple event bus for UI updates. Published events:
+## Important Gotchas
 
-- `text-delta`: Streaming text output
-- `tool-start`: Tool execution started
-- `tool-complete`: Tool execution finished
-- `finish`: Agent finished
+1. **Dual LLM Clients**: The project has two LLM client implementations. New code should use the lexilux-based `WoloLLMClient` in `wolo/llm_adapter.py`. The legacy `GLMClient` in `wolo/llm.py` is being phased out.
 
-## Important Implementation Details
+2. **Test Directories**: There are two test directories - `./tests/` and `./wolo/tests/`. This should be consolidated.
 
-### Todo System
+3. **CLI Routing Order**: The routing priority in `wolo/cli/main.py:_route_command()` is strict and must not be modified.
 
-Todos are stored in-memory per session (`_todos` dict in `tools.py`) and persisted to `todos.json`. The agent loop checks for incomplete todos before exiting. The agent does NOT stop if todos remain incomplete unless `max_steps` is reached.
+4. **Session PID Tracking**: When resuming sessions, the PID check prevents multiple processes from using the same session. Use `clear_session_pid()` on exit.
 
-### Smart Replace
+5. **MCP Background Init**: MCP servers start asynchronously. Tools may not be immediately available. Use `refresh_mcp_tools()` during polling.
 
-The `smart_replace()` function in `smart_replace.py` provides multiple matching strategies for `edit` tool:
-
-1. Exact match with whitespace normalization
-2. Fuzzy match with diff-based similarity
-
-### Question Tool
-
-The `question` tool enables interactive user prompts with options. Results are stored in `~/.wolo/sessions/{session_id}/questions/`.
-
-### Subagent Delegation
-
-The `task` tool spawns subagents in subsessions for parallel work. Subagent metrics are tracked in parent session.
-
-### Shell Process Tracking
-
-Running shell processes are tracked for Ctrl+S viewing (`get_shell_status()`). Completed shells are stored in history (last 10).
-
-## Entry Points
-
-- CLI: `wolo/cli:main_async()` - Argument parsing and session initialization
-- Package: `wolo.__main__:main()` - `python -m wolo`
-- REPL: `wolo/cli:repl_mode()` - Interactive mode
-
-## Error Handling
-
-`wolo/errors.py` classifies API errors and provides user-friendly messages. Retry strategy is determined by error type.
-
-## Package Management
-
-Wolo follows the same packaging approach as [lexilux](https://github.com/lzjever/lexilux):
-
-- **Version management**: Version is defined in `wolo/__init__.py` as `__version__` and dynamically read by setuptools
-- **Build system**: Uses `setuptools` with `dynamic = ["version"]` in pyproject.toml
-- **Release workflow**: GitHub Actions reads version from `__init__.py` using regex (not from pyproject.toml)
-
-### Local Lexilux Reference
-
-The lexilux development branch is available locally at:
-```
-/home/percy/works/mygithub/mbos-agent/lexilux
-```
-
-Use this as a reference when aligning packaging, CI/CD, or other implementation patterns with lexilux.
+6. **Lexilux Dependency**: The lexilux library is a local path dependency (`file:///home/percy/works/mygithub/mbos-agent/lexilux`). This must be available for the new LLM client to work.

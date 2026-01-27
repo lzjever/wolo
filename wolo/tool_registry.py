@@ -656,13 +656,26 @@ class ToolRegistry:
         }
 
     def format_tool_complete(
-        self, tool_name: str, output: str, status: str, duration: float
+        self,
+        tool_name: str,
+        output: str,
+        status: str,
+        duration: float,
+        metadata: dict | None = None,
     ) -> dict:
         """
         Format tool-complete event data.
 
+        Args:
+            tool_name: Name of the tool
+            output: Tool output text
+            status: Completion status
+            duration: Execution duration in seconds
+            metadata: Additional metadata from tool execution (diff, matches, etc.)
+
         Returns a dict with all display information.
         """
+        metadata = metadata or {}
         spec = self.get(tool_name)
         if spec:
             return {
@@ -671,7 +684,10 @@ class ToolRegistry:
                 "duration": duration,
                 "brief": spec.format_result(output, status),
                 "show_output": spec.show_output,
-                "output": output if spec.show_output else None,
+                "output": output
+                if spec.show_output
+                else output,  # Always pass output for verbose mode
+                "metadata": metadata,
             }
         return {
             "tool": tool_name,
@@ -679,7 +695,8 @@ class ToolRegistry:
             "duration": duration,
             "brief": "done" if status == "completed" else status,
             "show_output": False,
-            "output": None,
+            "output": output,
+            "metadata": metadata,
         }
 
 

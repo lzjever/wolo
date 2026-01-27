@@ -19,6 +19,7 @@ class EndpointConfig:
     temperature: float = 0.7
     max_tokens: int = 16384
     source_model: str | None = None
+    enable_think: bool = False  # Enable reasoning mode for this endpoint
 
 
 @dataclass
@@ -147,6 +148,7 @@ class Config:
                     temperature=ep.get("temperature", 0.7),
                     max_tokens=ep.get("max_tokens", 16384),
                     source_model=ep.get("source_model"),
+                    enable_think=ep.get("enable_think", False),  # Load from endpoint
                 )
             )
         return endpoints
@@ -317,8 +319,11 @@ class Config:
             servers=mcp_data.get("servers", {}),
         )
 
-        # Load enable_think from config or env
-        enable_think = config_data.get("enable_think", False)
+        # Load enable_think: endpoint > global config > env
+        if selected_endpoint:
+            enable_think = selected_endpoint.enable_think
+        else:
+            enable_think = config_data.get("enable_think", False)
         if not enable_think:
             enable_think = os.getenv("WOLO_ENABLE_THINK", "").lower() in ("true", "1", "yes")
 

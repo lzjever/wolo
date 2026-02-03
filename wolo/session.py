@@ -1007,6 +1007,38 @@ def to_llm_messages(messages: list[Message]) -> list[dict[str, Any]]:
 # ==================== Session Persistence (Backward Compatible) ====================
 
 
+def get_session_dir(session_id: str) -> Path:
+    """Get the directory for a session."""
+    return get_storage().base_dir / session_id
+
+
+def save_path_confirmations(session_id: str, confirmed_dirs: list[Path]) -> None:
+    """Save confirmed paths to session storage."""
+    confirmation_file = get_session_dir(session_id) / "path_confirmations.json"
+
+    data = {
+        "confirmed_dirs": [str(p) for p in confirmed_dirs],
+        "confirmation_count": len(confirmed_dirs),
+        "last_updated": datetime.now().isoformat(),
+    }
+
+    with open(confirmation_file, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_path_confirmations(session_id: str) -> list[Path]:
+    """Load confirmed paths from session storage."""
+    confirmation_file = get_session_dir(session_id) / "path_confirmations.json"
+
+    if not confirmation_file.exists():
+        return []
+
+    with open(confirmation_file) as f:
+        data = json.load(f)
+
+    return [Path(p) for p in data.get("confirmed_dirs", [])]
+
+
 def get_sessions_dir() -> Path:
     """Get the directory where sessions are stored."""
     return get_storage().base_dir

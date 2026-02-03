@@ -69,6 +69,7 @@ def get_config_schema(config_class: type) -> dict[str, Any]:
 
         # Handle nested dataclasses
         if is_dataclass(field_type):
+            field_info["type"] = "object"
             field_info["properties"] = get_config_schema(field_type).get("properties", {})
 
     return schema

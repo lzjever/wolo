@@ -495,7 +495,24 @@ async def _read_pdf(path: Path) -> dict[str, Any]:
 
 
 async def write_execute(file_path: str, content: str) -> dict[str, Any]:
-    """Write content to a file."""
+    """Write content to a file with path safety check."""
+    from wolo.path_guard import get_path_guard, Operation
+    from wolo.path_guard_exceptions import PathConfirmationRequired
+
+    # Check path safety
+    guard = get_path_guard()
+    result = guard.check(file_path, Operation.WRITE)
+
+    if result.requires_confirmation:
+        raise PathConfirmationRequired(file_path, "write")
+
+    if not result.allowed:
+        return {
+            "title": f"write: {file_path}",
+            "output": f"Permission denied: {result.reason}",
+            "metadata": {"error": "path_not_allowed"},
+        }
+
     path = Path(file_path)
 
     try:
@@ -520,7 +537,23 @@ async def write_execute(file_path: str, content: str) -> dict[str, Any]:
 
 async def edit_execute(file_path: str, old_text: str, new_text: str) -> dict[str, Any]:
     """Edit a file by replacing old_text with new_text using smart matching."""
+    from wolo.path_guard import get_path_guard, Operation
+    from wolo.path_guard_exceptions import PathConfirmationRequired
     import difflib
+
+    # Check path safety
+    guard = get_path_guard()
+    result = guard.check(file_path, Operation.WRITE)
+
+    if result.requires_confirmation:
+        raise PathConfirmationRequired(file_path, "edit")
+
+    if not result.allowed:
+        return {
+            "title": f"edit: {file_path}",
+            "output": f"Permission denied: {result.reason}",
+            "metadata": {"error": "path_not_allowed"},
+        }
 
     path = Path(file_path)
 
@@ -1091,6 +1124,9 @@ async def execute_tool(
                 FileTime.read(session_id, file_path)
 
         elif tool_part.tool == "write":
+            from wolo.path_guard_exceptions import PathConfirmationRequired
+            from wolo.cli.path_confirmation import handle_path_confirmation, SessionCancelled
+
             file_path = tool_part.input.get("file_path", "")
             content = tool_part.input.get("content", "")
 
@@ -1107,7 +1143,25 @@ async def execute_tool(
                     # Skip the write
                     raise
 
-            result = await write_execute(file_path, content)
+            # Try to write, handle confirmation if needed
+            try:
+                result = await write_execute(file_path, content)
+            except PathConfirmationRequired as e:
+                # Handle confirmation
+                try:
+                    allowed = await handle_path_confirmation(e.path, e.operation)
+                    if allowed:
+                        # Retry after confirmation
+                        result = await write_execute(file_path, content)
+                    else:
+                        tool_part.status = "error"
+                        tool_part.output = f"Permission denied by user: {e.path}"
+                        return  # Don't continue with normal completion flow
+                except SessionCancelled:
+                    tool_part.status = "error"
+                    tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                    return  # Don't continue with normal completion flow
+
             tool_part.output = result["output"]
             tool_part.status = "completed"
             # Store metadata for verbose display
@@ -1124,6 +1178,9 @@ async def execute_tool(
                 FileTime.update(session_id, file_path)
 
         elif tool_part.tool == "edit":
+            from wolo.path_guard_exceptions import PathConfirmationRequired
+            from wolo.cli.path_confirmation import handle_path_confirmation, SessionCancelled
+
             file_path = tool_part.input.get("file_path", "")
             old_text = tool_part.input.get("old_text", "")
             new_text = tool_part.input.get("new_text", "")
@@ -1141,7 +1198,25 @@ async def execute_tool(
                     # Skip the edit
                     raise
 
-            result = await edit_execute(file_path, old_text, new_text)
+            # Try to edit, handle confirmation if needed
+            try:
+                result = await edit_execute(file_path, old_text, new_text)
+            except PathConfirmationRequired as e:
+                # Handle confirmation
+                try:
+                    allowed = await handle_path_confirmation(e.path, e.operation)
+                    if allowed:
+                        # Retry after confirmation
+                        result = await edit_execute(file_path, old_text, new_text)
+                    else:
+                        tool_part.status = "error"
+                        tool_part.output = f"Permission denied by user: {e.path}"
+                        return  # Don't continue with normal completion flow
+                except SessionCancelled:
+                    tool_part.status = "error"
+                    tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                    return  # Don't continue with normal completion flow
+
             tool_part.output = result["output"]
             tool_part.status = "completed"
             # Store metadata for verbose display (including diff)

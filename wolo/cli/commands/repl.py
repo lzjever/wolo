@@ -94,6 +94,11 @@ class ReplCommand(BaseCommand):
 
         check_and_set_session_pid(session_id)
 
+        # Initialize PathGuard with config, CLI paths, and session confirmations
+        from wolo.cli.main import _initialize_path_guard
+
+        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id)
+
         # Setup output configuration and event handlers
         from wolo.cli.output import OutputConfig
 

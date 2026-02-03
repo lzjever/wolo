@@ -70,6 +70,11 @@ class ReplCommand(BaseCommand):
             print(f"Error: {e}", file=sys.stderr)
             return ExitCode.CONFIG_ERROR
 
+        # Initialize PathGuard with config and CLI-provided paths
+        from wolo.cli.main import _initialize_path_guard
+
+        _initialize_path_guard(config, args.execution_options.allowed_paths)
+
         # Validate agent type
         if args.execution_options.agent_type not in AGENTS:
             print(

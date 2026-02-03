@@ -52,12 +52,14 @@ class TestPathGuardInitialization:
             api_key="test",
             model="test",
             base_url="https://test.com",
+            temperature=0.7,
+            max_tokens=16384,
             path_safety=PathSafetyConfig(
                 allowed_write_paths=[Path("/workspace")]
             )
         )
 
-        with patch('wolo.cli.main.set_path_guard') as mock_set:
+        with patch('wolo.path_guard.set_path_guard') as mock_set:
             _initialize_path_guard(config, [])
 
             mock_set.assert_called_once()
@@ -72,10 +74,12 @@ class TestPathGuardInitialization:
         config = Config(
             api_key="test",
             model="test",
-            base_url="https://test.com"
+            base_url="https://test.com",
+            temperature=0.7,
+            max_tokens=16384,
         )
 
-        with patch('wolo.cli.main.set_path_guard') as mock_set:
+        with patch('wolo.path_guard.set_path_guard') as mock_set:
             _initialize_path_guard(config, ["/workspace", "/var/tmp"])
 
             mock_set.assert_called_once()

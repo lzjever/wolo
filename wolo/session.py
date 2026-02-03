@@ -1052,6 +1052,17 @@ def save_session(session_id: str, sessions_dir: Path | None = None) -> None:
 
     storage = get_storage()
     storage.save_full_session(session)
+
+    # Save path confirmations
+    try:
+        from wolo.path_guard import get_path_guard
+
+        confirmed = get_path_guard().get_confirmed_dirs()
+        save_path_confirmations(session_id, confirmed)
+    except Exception:
+        # Don't fail if PathGuard is not initialized or has issues
+        pass
+
     logger.info(f"Session saved: {session_id[:8]}...")
 
 

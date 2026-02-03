@@ -35,3 +35,16 @@ class TestPathGuardBasics:
 
         result = guard.check("/workspace/file.py", Operation.WRITE)
         assert result.requires_confirmation is True
+
+
+class TestPathConfirmationRequired:
+    def test_exception_attributes(self):
+        """Exception should store path and operation"""
+        from wolo.path_guard_exceptions import PathConfirmationRequired
+
+        exc = PathConfirmationRequired("/workspace/test.txt", "write")
+
+        assert exc.path == "/workspace/test.txt"
+        assert exc.operation == "write"
+        assert "write" in str(exc)
+        assert "/workspace/test.txt" in str(exc)

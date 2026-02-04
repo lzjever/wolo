@@ -31,6 +31,7 @@ SHORT_OPTIONS = {
     "-n": "--max-steps",
     "-O": "--output-style",
     "-C": "--workdir",
+    "-P": "--allow-path",
 }
 
 # Options that require values
@@ -59,6 +60,8 @@ OPTIONS_NEEDING_VALUE = {
     "-O",
     "--workdir",
     "-C",
+    "--allow-path",
+    "-P",
 }
 
 # Valid output style choices
@@ -71,6 +74,13 @@ MUTUALLY_EXCLUSIVE_GROUPS = [
     # Session creation vs resume (can't do both)
     {"--session", "-s", "--resume", "-r"},
 ]
+
+# Options that can be specified multiple times
+MULTI_VALUE_OPTIONS = {
+    "--allow-path",
+    "-P",
+    "allow-path",
+}
 
 # Deprecated options with migration hints
 DEPRECATED_OPTIONS = {
@@ -116,6 +126,8 @@ class ExecutionOptions:
     json_output: bool = False
     # Working directory
     workdir: str | None = None  # Working directory for the session
+    # Path safety options
+    allowed_paths: list[str] = field(default_factory=list)  # Paths from --allow-path/-P
 
 
 @dataclass
@@ -318,10 +330,23 @@ class FlexibleArgumentParser:
             else:
                 # Positional argument or option value
                 if option_expecting_value:
-                    options[option_expecting_value] = arg
-                    # Also store with -- prefix for lookup
-                    if not option_expecting_value.startswith("--"):
-                        options[f"--{option_expecting_value}"] = arg
+                    # Check if this is a multi-value option
+                    if option_expecting_value in MULTI_VALUE_OPTIONS:
+                        # Store as list, appending to existing values
+                        if option_expecting_value not in options:
+                            options[option_expecting_value] = []
+                        options[option_expecting_value].append(arg)
+                        # Also store with -- prefix for lookup
+                        if not option_expecting_value.startswith("--"):
+                            long_opt = SHORT_OPTIONS.get(option_expecting_value, f"--{option_expecting_value}")
+                            if long_opt not in options:
+                                options[long_opt] = []
+                            options[long_opt].append(arg)
+                    else:
+                        options[option_expecting_value] = arg
+                        # Also store with -- prefix for lookup
+                        if not option_expecting_value.startswith("--"):
+                            options[f"--{option_expecting_value}"] = arg
                     option_expecting_value = None
                 else:
                     positional.append(arg)
@@ -482,3 +507,15 @@ class FlexibleArgumentParser:
             workdir = options.get("--workdir") or options.get("-C")
             if workdir:
                 result.execution_options.workdir = workdir
+
+        # Path safety: allowed paths (from --allow-path/-P)
+        # This option can be specified multiple times
+        # Note: We only check the long form since the parser stores both short and long forms
+        allowed_paths = []
+        if "--allow-path" in options:
+            value = options.get("--allow-path")
+            if isinstance(value, list):
+                allowed_paths.extend(value)
+            elif value:
+                allowed_paths.append(value)
+        result.execution_options.allowed_paths = allowed_paths

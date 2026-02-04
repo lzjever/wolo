@@ -198,6 +198,11 @@ class RunCommand(BaseCommand):
             session_id = create_session(agent_name=agent_name, workdir=workdir)
             check_and_set_session_pid(session_id)
 
+        # Initialize PathGuard with config, CLI paths, and session confirmations
+        from wolo.cli.main import _initialize_path_guard
+
+        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id)
+
         # Setup output configuration first (needed for print_session_info)
         from wolo.cli.output import OutputConfig
 

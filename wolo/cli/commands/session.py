@@ -362,6 +362,11 @@ class SessionResumeCommand(BaseCommand):
         mode_config = ModeConfig.for_mode(ExecutionMode.REPL)
         quota_config = QuotaConfig(max_steps=args.execution_options.max_steps)
 
+        # Initialize PathGuard with config, CLI paths, and session confirmations
+        from wolo.cli.main import _initialize_path_guard
+
+        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id)
+
         # Setup output configuration and event handlers
         from wolo.cli.output import OutputConfig
 

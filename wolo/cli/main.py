@@ -5,6 +5,7 @@ This module handles command routing and dispatches to appropriate handlers.
 """
 
 import sys
+from pathlib import Path
 
 from wolo.cli.commands.config import ConfigCommandGroup
 from wolo.cli.commands.debug import DebugCommandGroup
@@ -145,6 +146,34 @@ Examples:
   wolo --coop "help me design the API"
 """)
     return ExitCode.SUCCESS
+
+
+def _initialize_path_guard(config, cli_paths: list[str], session_id: str | None = None) -> None:
+    """Initialize PathGuard with config and CLI-provided paths.
+
+    Args:
+        config: Configuration object containing path_safety settings
+        cli_paths: List of paths provided via --allow-path CLI argument
+        session_id: Optional session ID to load confirmed paths from
+    """
+    from pathlib import Path as PathLib
+    from wolo.path_guard import PathGuard, set_path_guard
+    from wolo.session import load_path_confirmations
+
+    config_paths = config.path_safety.allowed_write_paths
+    cli_path_objects = [PathLib(p).resolve() for p in cli_paths]
+
+    # Load session-confirmed paths if resuming a session
+    session_confirmed = []
+    if session_id:
+        session_confirmed = load_path_confirmations(session_id)
+
+    guard = PathGuard(
+        config_paths=config_paths,
+        cli_paths=cli_path_objects,
+        session_confirmed=session_confirmed,
+    )
+    set_path_guard(guard)
 
 
 def main() -> int:

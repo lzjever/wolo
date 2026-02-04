@@ -1,7 +1,7 @@
 """Comprehensive tests for subprocess_manager.py."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -264,7 +264,7 @@ class TestManagedSubprocess:
     async def test_managed_subprocess_registers_and_unregisters(self):
         """Test that process is registered and unregistered properly."""
         reset_registry()
-        registry = get_registry()
+        get_registry()
 
         mock_process = MockProcess()
         mock_process.complete(0)

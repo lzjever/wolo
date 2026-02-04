@@ -73,7 +73,7 @@ class SubprocessRegistry:
                     if process.returncode is None:
                         try:
                             process.kill()
-                            await process.wait()
+                            await asyncio.wait_for(process.wait(), timeout=1.0)
                         except Exception as e:
                             logger.debug(f"Error killing process {process.pid}: {e}")
 
@@ -129,7 +129,7 @@ async def managed_subprocess(*args: Any, **kwargs: Any) -> asyncio.subprocess.Pr
             except (asyncio.TimeoutError, Exception):
                 try:
                     process.kill()
-                    await process.wait()
+                    await asyncio.wait_for(process.wait(), timeout=1.0)
                 except Exception as e:
                     logger.debug(f"Error cleaning up subprocess {process.pid}: {e}")
 

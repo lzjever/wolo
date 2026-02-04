@@ -7,6 +7,7 @@ import pytest
 # Check if lexilux is available - skip entire module if not
 try:
     import lexilux  # noqa: F401
+
     LEXILUX_AVAILABLE = True
 except ImportError:
     LEXILUX_AVAILABLE = False

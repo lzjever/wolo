@@ -82,11 +82,38 @@ OTHER OPTIONS:
     -n, --max-steps <n>     Max steps (default: 100)
     -L, --log-level <lvl>   DEBUG, INFO, WARNING, ERROR
     -S, --save              Force save session on completion
-    -C, --workdir <path>    Working directory (saved with session)
+    -C, --workdir <path>    Working directory for file operations (automatically whitelisted)
+    -P, --allow-path <path> Add path to whitelist (can be used multiple times)
     --api-key <key>         API key (required if using --baseurl)
 
     If --baseurl is specified, all three (--baseurl, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
+
+PATH PROTECTION:
+    Wolo uses whitelist-based path protection to ensure safe file operations.
+    By default, only the working directory (if set via -C) and /tmp are allowed.
+
+    Path Whitelist Priority (highest to lowest):
+        1. Working directory (-C/--workdir) - automatically allowed, highest priority
+        2. CLI whitelist paths (-P/--allow-path)
+        3. Config file whitelist (path_safety.allowed_write_paths)
+        4. Default allowed (/tmp)
+
+    Examples:
+        wolo -C /path/to/project "modify files"
+            Allows all operations within /path/to/project
+
+        wolo -C /path/to/project -P /home/user/docs "modify files"
+            Allows operations in /path/to/project AND /home/user/docs
+
+        wolo "modify files"
+            Requires confirmation for paths outside /tmp
+
+    Configuration file whitelist (~/.wolo/config.yaml):
+        path_safety:
+          allowed_write_paths:
+            - /home/user/projects
+            - /home/user/documents
 
 OUTPUT OPTIONS:
     -O, --output-style <s>  Output style: minimal (no color), default, verbose
@@ -234,7 +261,11 @@ OPTIONS:
     -b, --baseurl <url> LLM service base URL (direct, bypasses config file)
     -m, --model <m>     Model name (required if using --baseurl)
     -n, --max-steps <n> Max steps per turn
+    -C, --workdir <p>   Working directory for file operations (automatically whitelisted)
+    -P, --allow-path <p> Add path to whitelist (can be used multiple times)
     --api-key <key>     API key (required if using --baseurl)
+
+    See 'wolo --help' for PATH PROTECTION details
 
 REPL COMMANDS:
     /exit, /quit        Exit REPL

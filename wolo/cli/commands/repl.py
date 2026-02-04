@@ -86,18 +86,32 @@ class ReplCommand(BaseCommand):
         mode_config = ModeConfig.for_mode(ExecutionMode.REPL)
         quota_config = QuotaConfig(max_steps=args.execution_options.max_steps)
 
-        # Create session
+        # Create session and handle working directory
         agent_name = get_random_agent_name()
         workdir = args.execution_options.workdir  # May be None (defaults to cwd)
+
+        # Change to working directory BEFORE initializing PathGuard
+        # This ensures the working directory is the highest priority path
+        workdir_to_use = None
+        if workdir:
+            import os
+
+            workdir_to_use = os.path.abspath(workdir)
+            try:
+                os.chdir(workdir_to_use)
+            except OSError as e:
+                print(f"Error: Cannot change to working directory '{workdir_to_use}': {e}", file=sys.stderr)
+                return ExitCode.ERROR
+
         session_id = create_session(agent_name=agent_name, workdir=workdir)
         from wolo.session import check_and_set_session_pid
 
         check_and_set_session_pid(session_id)
 
-        # Initialize PathGuard with config, CLI paths, and session confirmations
+        # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
         from wolo.cli.main import _initialize_path_guard
 
-        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id)
+        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id, workdir_to_use)
 
         # Setup output configuration and event handlers
         from wolo.cli.output import OutputConfig

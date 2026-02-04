@@ -32,15 +32,22 @@ class PathGuard:
     """Path protection class using whitelist mode.
 
     Default behavior:
-        - Only /tmp is allowed without confirmation
+        - Only the working directory (if set) and /tmp are allowed without confirmation
         - All other paths require user confirmation
         - Confirmed directories are stored per session
 
     Whitelist sources (in priority order):
-        1. Default allowed paths (/tmp)
-        2. Config file paths
-        3. CLI-provided paths
-        4. User-confirmed paths (stored in session)
+        1. Working directory (from -C/--workdir) - highest priority, automatically allowed
+        2. CLI-provided paths (--allow-path/-P)
+        3. Config file paths (path_safety.allowed_write_paths)
+        4. Default allowed paths (/tmp)
+        5. User-confirmed paths (stored in session)
+
+    Path Protection Rules:
+        - When using -C/--workdir, all paths within that directory are automatically allowed
+        - The working directory takes highest priority for path protection
+        - Use --allow-path/-P to add additional whitelisted directories
+        - Paths outside any whitelist require user confirmation
     """
 
     def __init__(
@@ -48,11 +55,15 @@ class PathGuard:
         config_paths: Iterable[Path] = (),
         cli_paths: Iterable[Path] = (),
         session_confirmed: Iterable[Path] = (),
+        workdir: Path | None = None,
     ):
         # Default: only allow /tmp
         self._default_allowed = {Path("/tmp").resolve()}
 
-        # Merge all whitelist sources
+        # Working directory (highest priority)
+        self._workdir = Path(workdir).resolve() if workdir else None
+
+        # Merge all whitelist sources (excluding workdir, which is checked separately)
         self._allowed_paths = set(self._default_allowed)
         for p in config_paths:
             self._allowed_paths.add(Path(p).resolve())
@@ -94,7 +105,16 @@ class PathGuard:
                 operation=operation
             )
 
-        # 2. Check default allowed list (only /tmp)
+        # 2. Check working directory (HIGHEST PRIORITY)
+        if self._workdir:
+            if normalized.is_relative_to(self._workdir) or normalized == self._workdir:
+                return CheckResult(
+                    allowed=True,
+                    requires_confirmation=False,
+                    operation=operation
+                )
+
+        # 3. Check default allowed list (only /tmp)
         for allowed in self._default_allowed:
             if normalized.is_relative_to(allowed) or normalized == allowed:
                 return CheckResult(
@@ -103,7 +123,7 @@ class PathGuard:
                     operation=operation
                 )
 
-        # 3. Check config/CLI whitelist
+        # 4. Check config/CLI whitelist
         for allowed in self._allowed_paths:
             if normalized.is_relative_to(allowed) or normalized == allowed:
                 return CheckResult(
@@ -112,7 +132,7 @@ class PathGuard:
                     operation=operation
                 )
 
-        # 4. Check session-confirmed directories
+        # 5. Check session-confirmed directories
         for confirmed in self._confirmed_dirs:
             if normalized.is_relative_to(confirmed):
                 return CheckResult(
@@ -121,7 +141,7 @@ class PathGuard:
                     operation=operation
                 )
 
-        # 5. Requires user confirmation
+        # 6. Requires user confirmation
         return CheckResult(
             allowed=False,
             requires_confirmation=True,

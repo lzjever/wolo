@@ -148,13 +148,23 @@ Examples:
     return ExitCode.SUCCESS
 
 
-def _initialize_path_guard(config, cli_paths: list[str], session_id: str | None = None) -> None:
-    """Initialize PathGuard with config and CLI-provided paths.
+def _initialize_path_guard(
+    config, cli_paths: list[str], session_id: str | None = None, workdir: str | None = None
+) -> None:
+    """Initialize PathGuard with config, CLI paths, workdir, and session confirmations.
+
+    Priority order for path protection (highest to lowest):
+        1. Working directory (from -C/--workdir) - highest priority
+        2. CLI-provided paths (--allow-path/-P)
+        3. Config file paths (path_safety.allowed_write_paths)
+        4. Default allowed paths (/tmp)
+        5. User-confirmed paths (stored in session)
 
     Args:
         config: Configuration object containing path_safety settings
         cli_paths: List of paths provided via --allow-path CLI argument
         session_id: Optional session ID to load confirmed paths from
+        workdir: Optional working directory path (automatically allowed if set)
     """
     from pathlib import Path as PathLib
     from wolo.path_guard import PathGuard, set_path_guard
@@ -162,6 +172,9 @@ def _initialize_path_guard(config, cli_paths: list[str], session_id: str | None 
 
     config_paths = config.path_safety.allowed_write_paths
     cli_path_objects = [PathLib(p).resolve() for p in cli_paths]
+
+    # Resolve workdir to absolute path
+    workdir_path = PathLib(workdir).resolve() if workdir else None
 
     # Load session-confirmed paths if resuming a session
     session_confirmed = []
@@ -172,6 +185,7 @@ def _initialize_path_guard(config, cli_paths: list[str], session_id: str | None 
         config_paths=config_paths,
         cli_paths=cli_path_objects,
         session_confirmed=session_confirmed,
+        workdir=workdir_path,
     )
     set_path_guard(guard)
 

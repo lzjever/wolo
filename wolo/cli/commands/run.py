@@ -198,10 +198,23 @@ class RunCommand(BaseCommand):
             session_id = create_session(agent_name=agent_name, workdir=workdir)
             check_and_set_session_pid(session_id)
 
-        # Initialize PathGuard with config, CLI paths, and session confirmations
+        # Change to working directory BEFORE initializing PathGuard
+        # This ensures the working directory is the highest priority path
+        workdir_to_use = None
+        if args.execution_options.workdir:
+            import os
+
+            workdir_to_use = os.path.abspath(args.execution_options.workdir)
+            try:
+                os.chdir(workdir_to_use)
+            except OSError as e:
+                print(f"Error: Cannot change to working directory '{workdir_to_use}': {e}", file=sys.stderr)
+                return ExitCode.ERROR
+
+        # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
         from wolo.cli.main import _initialize_path_guard
 
-        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id)
+        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id, workdir_to_use)
 
         # Setup output configuration first (needed for print_session_info)
         from wolo.cli.output import OutputConfig

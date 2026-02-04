@@ -83,3 +83,52 @@ class TestPathGuardInitialization:
             _initialize_path_guard(config, ["/workspace", "/var/tmp"])
 
             mock_set.assert_called_once()
+
+    def test_initializes_with_workdir(self):
+        """PathGuard should include working directory with highest priority"""
+        from wolo.config import Config
+        from wolo.cli.main import _initialize_path_guard
+
+        config = Config(
+            api_key="test",
+            model="test",
+            base_url="https://test.com",
+            temperature=0.7,
+            max_tokens=16384,
+        )
+
+        with patch('wolo.path_guard.set_path_guard') as mock_set:
+            workdir = "/custom/workdir"
+            _initialize_path_guard(config, [], None, workdir)
+
+            mock_set.assert_called_once()
+            guard = mock_set.call_args[0][0]
+            # Verify workdir is set on the guard
+            assert guard._workdir == Path("/custom/workdir").resolve()
+
+    def test_workdir_allows_operations_within_it(self):
+        """Operations within workdir should be allowed without confirmation"""
+        from wolo.config import Config
+        from wolo.cli.main import _initialize_path_guard
+        from wolo.path_guard import Operation, get_path_guard
+
+        config = Config(
+            api_key="test",
+            model="test",
+            base_url="https://test.com",
+            temperature=0.7,
+            max_tokens=16384,
+        )
+
+        workdir = "/test/workdir"
+        _initialize_path_guard(config, [], None, workdir)
+
+        guard = get_path_guard()
+        # Paths within workdir should be allowed
+        result = guard.check("/test/workdir/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        # Paths outside workdir should require confirmation
+        result = guard.check("/other/path/file.py", Operation.WRITE)
+        assert result.requires_confirmation is True

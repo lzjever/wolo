@@ -36,6 +36,61 @@ class TestPathGuardBasics:
         result = guard.check("/workspace/file.py", Operation.WRITE)
         assert result.requires_confirmation is True
 
+    def test_workdir_allows_all_paths_within_it(self):
+        """Working directory should allow all paths within it without confirmation"""
+        workdir = Path("/workspace/test_project")
+        guard = PathGuard(workdir=workdir)
+
+        # Paths within workdir should be allowed
+        result = guard.check("/workspace/test_project/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        # Nested paths should be allowed
+        result = guard.check("/workspace/test_project/src/module.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        # Paths outside workdir should require confirmation
+        result = guard.check("/other/path/file.py", Operation.WRITE)
+        assert result.requires_confirmation is True
+
+    def test_workdir_has_highest_priority(self):
+        """Working directory should have highest priority among whitelist sources"""
+        workdir = Path("/custom/workdir")
+        config_paths = [Path("/config/path")]
+        cli_paths = [Path("/cli/path")]
+        session_confirmed = [Path("/confirmed/path")]
+
+        guard = PathGuard(
+            config_paths=config_paths,
+            cli_paths=cli_paths,
+            session_confirmed=session_confirmed,
+            workdir=workdir,
+        )
+
+        # Workdir paths should be allowed
+        result = guard.check("/custom/workdir/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        # Other whitelist sources should still work
+        result = guard.check("/config/path/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        result = guard.check("/cli/path/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        result = guard.check("/confirmed/path/file.py", Operation.WRITE)
+        assert result.allowed is True
+        assert result.requires_confirmation is False
+
+        # Non-whitelisted paths require confirmation
+        result = guard.check("/random/path/file.py", Operation.WRITE)
+        assert result.requires_confirmation is True
+
 
 class TestPathConfirmationRequired:
     def test_exception_attributes(self):

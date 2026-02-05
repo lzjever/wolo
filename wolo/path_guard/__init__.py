@@ -13,6 +13,7 @@ Public API:
     ConfirmationStrategy: Abstract confirmation handler
 """
 
+from wolo.path_guard.checker import PathChecker, PathWhitelist
 from wolo.path_guard.exceptions import (
     PathCheckError,
     PathConfirmationRequired,
@@ -23,6 +24,9 @@ from wolo.path_guard.models import CheckResult, Operation
 
 # Export public API
 __all__ = [
+    # Core
+    "PathChecker",
+    "PathWhitelist",
     # Exceptions
     "PathGuardError",
     "PathCheckError",

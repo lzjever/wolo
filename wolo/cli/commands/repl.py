@@ -2,7 +2,9 @@
 REPL command for Wolo CLI.
 
 Starts an interactive conversation session.
-Can be invoked as 'wolo chat' or 'wolo repl' (synonyms).
+Can be invoked as:
+- 'wolo chat' or 'wolo --repl' (new session)
+- 'wolo -r <id>' or 'wolo session resume <id>' (resume session)
 """
 
 import asyncio
@@ -86,32 +88,95 @@ class ReplCommand(BaseCommand):
         mode_config = ModeConfig.for_mode(ExecutionMode.REPL)
         quota_config = QuotaConfig(max_steps=args.execution_options.max_steps)
 
-        # Create session and handle working directory
-        agent_name = get_random_agent_name()
+        # Handle session: resume existing or create new
+        from wolo.session import (
+            check_and_set_session_pid,
+            get_session_status,
+            load_session,
+        )
+
         workdir = args.execution_options.workdir  # May be None (defaults to cwd)
+        workdir_to_use = None  # Will be set below
 
-        # Change to working directory BEFORE initializing PathGuard
-        # This ensures the working directory is the highest priority path
-        workdir_to_use = None
-        if workdir:
-            import os
+        if args.session_options.resume_id:
+            # Resume existing session
+            resume_id = args.session_options.resume_id
+            status = get_session_status(resume_id)
+            if not status.get("exists"):
+                print(f"Error: Session not found: {resume_id}", file=sys.stderr)
+                return ExitCode.SESSION_ERROR
 
-            workdir_to_use = os.path.abspath(workdir)
+            if status.get("is_running"):
+                pid = status.get("pid")
+                print(
+                    f"Error: Session '{resume_id}' is already running (PID: {pid})",
+                    file=sys.stderr,
+                )
+                print(f"       Use 'wolo -w {resume_id}' to watch it.", file=sys.stderr)
+                return ExitCode.SESSION_ERROR
+
+            if not check_and_set_session_pid(resume_id):
+                print(f"Error: Failed to acquire session lock for: {resume_id}", file=sys.stderr)
+                return ExitCode.SESSION_ERROR
+
             try:
-                os.chdir(workdir_to_use)
-            except OSError as e:
-                print(f"Error: Cannot change to working directory '{workdir_to_use}': {e}", file=sys.stderr)
-                return ExitCode.ERROR
+                load_session(resume_id)
+                session_id = resume_id
+            except (FileNotFoundError, ValueError) as e:
+                print(f"Error: {e}", file=sys.stderr)
+                return ExitCode.SESSION_ERROR
 
-        session_id = create_session(agent_name=agent_name, workdir=workdir)
-        from wolo.session import check_and_set_session_pid
+            # Check workdir match (warning only, don't block)
+            from wolo.cli.utils import check_workdir_match, print_workdir_warning
 
-        check_and_set_session_pid(session_id)
+            matches, session_workdir, current_workdir = check_workdir_match(session_id)
+            if not matches and session_workdir:
+                print_workdir_warning(session_workdir, current_workdir)
+        else:
+            # Create new session
+            agent_name = get_random_agent_name()
+
+            # Change to working directory BEFORE initializing PathGuard
+            # This ensures the working directory is the highest priority path
+            workdir_to_use = None
+            if workdir:
+                import os
+
+                workdir_to_use = os.path.abspath(workdir)
+                try:
+                    os.chdir(workdir_to_use)
+                except OSError as e:
+                    print(
+                        f"Error: Cannot change to working directory '{workdir_to_use}': {e}",
+                        file=sys.stderr,
+                    )
+                    return ExitCode.ERROR
+
+            session_id = create_session(agent_name=agent_name, workdir=workdir)
+            check_and_set_session_pid(session_id)
+
+        # For resume case, get workdir_to_use from session or CLI
+        if args.session_options.resume_id:
+            workdir_to_use = workdir
+            if workdir_to_use:
+                import os
+
+                workdir_to_use = os.path.abspath(workdir_to_use)
+                try:
+                    os.chdir(workdir_to_use)
+                except OSError as e:
+                    print(
+                        f"Error: Cannot change to working directory '{workdir_to_use}': {e}",
+                        file=sys.stderr,
+                    )
+                    return ExitCode.ERROR
 
         # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
         from wolo.cli.main import _initialize_path_guard
 
-        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id, workdir_to_use)
+        _initialize_path_guard(
+            config, args.execution_options.allowed_paths, session_id, workdir_to_use
+        )
 
         # Setup output configuration and event handlers
         from wolo.cli.output import OutputConfig

@@ -166,7 +166,7 @@ class TestSummaryPolicyApply:
         ]
         mock_client.chat_completion.return_value = mock_stream
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             context = create_context(
                 messages,
@@ -207,7 +207,7 @@ class TestSummaryPolicyApply:
         mock_client = MagicMock()
         mock_client.chat_completion.side_effect = Exception("LLM API error")
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             context = create_context(
                 messages,
@@ -234,7 +234,7 @@ class TestSummaryPolicyApply:
         ]
         mock_client.chat_completion.return_value = mock_stream
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             context = create_context(
                 messages,
@@ -264,7 +264,7 @@ class TestSummaryPolicyApply:
         ]
         mock_client.chat_completion.return_value = mock_stream
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             recent_ids = [m.id for m in messages[-keep_exchanges * 2 :]]
 
@@ -294,7 +294,7 @@ class TestSummaryPolicyApply:
         ]
         mock_client.chat_completion.return_value = mock_stream
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             context = create_context(
                 messages,
@@ -331,7 +331,7 @@ class TestSummaryPolicyApply:
         ]
         mock_client.chat_completion.return_value = mock_stream
 
-        with patch("wolo.llm.GLMClient", return_value=mock_client):
+        with patch("wolo.llm_adapter.WoloLLMClient", return_value=mock_client):
             messages = create_messages(20, text_length=200)
             context = create_context(
                 messages,

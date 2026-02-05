@@ -40,7 +40,7 @@ ruff check --fix .         # Auto-fix lint issues
 - Main execution loop: `agent_loop()` - runs LLM calls, handles tool execution, checks for completion
 - Doom loop detection: prevents infinite loops by detecting repeated tool calls with identical input
 - Step boundary handling: supports pause/resume via `ControlManager`
-- Dynamic client selection: chooses between legacy `GLMClient` and lexilux-based `WoloLLMClient` based on `config.use_lexilux_client`
+- Uses `WoloLLMClient` from `wolo/llm_adapter.py` for all LLM interactions
 
 **Session Management** (`wolo/session.py`)
 - Layered storage: `session.json` (metadata) + `messages/*.json` (individual messages) + `todos.json`
@@ -54,11 +54,11 @@ ruff check --fix .         # Auto-fix lint issues
 - File modification tracking via `FileTime`: prevents editing files that changed externally since last read
 - MCP tools prefixed with `mcp_` and loaded dynamically
 
-**LLM Client Architecture**
-- Legacy client: `wolo/llm.py` - GLM-specific implementation (deprecated)
-- New client: `wolo/llm_adapter.py` - `WoloLLMClient` using lexilux library
-- Selection: controlled by `config.use_lexilux_client` flag or `WOLO_USE_LEXILUX_CLIENT` env var
-- Lexilux client supports all OpenAI-compatible models (OpenAI, Anthropic, DeepSeek, etc.)
+**LLM Client** (`wolo/llm_adapter.py`)
+- `WoloLLMClient`: unified LLM client using lexilux library
+- Supports all OpenAI-compatible models (OpenAI, Anthropic, DeepSeek, GLM, etc.)
+- Token tracking via `get_token_usage()` and `reset_token_usage()`
+- Debug logging to file/directory when configured
 
 **MCP Integration** (`wolo/mcp_integration.py`, `wolo/mcp/`)
 - Loads MCP servers from Claude Desktop config (`~/.claude/claude_desktop_config.json`) or Wolo config
@@ -99,8 +99,7 @@ ruff check --fix .         # Auto-fix lint issues
 - Primary config file: `~/.wolo/config.yaml`
 - Environment variables: `GLM_API_KEY`, `WOLO_MODEL`, `WOLO_API_BASE`
 - Direct mode: `--baseurl` + `--api-key` + `--model` bypasses config file
-- Modular configs: `ClaudeCompatConfig`, `MCPConfig`, `CompactionConfig`
-- Lexilux flag: `use_lexilux_client` in config or `WOLO_USE_LEXILUX_CLIENT` env var
+- Modular configs: `ClaudeCompatConfig`, `MCPConfig`, `CompactionConfig`, `PathSafetyConfig`
 
 ## Key Patterns and Conventions
 
@@ -140,14 +139,15 @@ async def mytool_execute(param: str) -> dict[str, Any]:
 
 ## Important Gotchas
 
-1. **Dual LLM Clients**: The project has two LLM client implementations. New code should use the lexilux-based `WoloLLMClient` in `wolo/llm_adapter.py`. The legacy `GLMClient` in `wolo/llm.py` is being phased out.
+1. **CLI Routing Order**: The routing priority in `wolo/cli/main.py:_route_command()` is strict and must not be modified.
 
-2. **Test Directories**: There are two test directories - `./tests/` and `./wolo/tests/`. This should be consolidated.
+2. **Session PID Tracking**: When resuming sessions, the PID check prevents multiple processes from using the same session. Use `clear_session_pid()` on exit.
 
-3. **CLI Routing Order**: The routing priority in `wolo/cli/main.py:_route_command()` is strict and must not be modified.
+3. **MCP Background Init**: MCP servers start asynchronously. Tools may not be immediately available. Use `refresh_mcp_tools()` during polling.
 
-4. **Session PID Tracking**: When resuming sessions, the PID check prevents multiple processes from using the same session. Use `clear_session_pid()` on exit.
+4. **Lexilux Dependency**: The lexilux library is a local path dependency. This must be available for the LLM client to work.
 
-5. **MCP Background Init**: MCP servers start asynchronously. Tools may not be immediately available. Use `refresh_mcp_tools()` during polling.
-
-6. **Lexilux Dependency**: The lexilux library is a local path dependency (`file:///home/percy/works/mygithub/mbos-agent/lexilux`). This must be available for the new LLM client to work.
+5. **Test Directory Structure**: Tests are organized as:
+   - `tests/unit/` - Unit tests for individual modules
+   - `tests/compaction/` - Compaction subsystem tests
+   - `tests/path_safety/` - Path safety feature tests

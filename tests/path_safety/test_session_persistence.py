@@ -1,9 +1,8 @@
 # tests/path_safety/test_session_persistence.py
-import pytest
 import json
 from pathlib import Path
-from datetime import datetime
-from wolo.session import save_path_confirmations, load_path_confirmations, get_session_dir
+
+from wolo.session import load_path_confirmations, save_path_confirmations
 
 
 class TestPathConfirmationPersistence:
@@ -15,6 +14,7 @@ class TestPathConfirmationPersistence:
 
         # Mock get_session_dir
         import wolo.session
+
         monkeypatch.setattr(wolo.session, "get_session_dir", lambda sid: session_dir)
 
         confirmed_dirs = [Path("/workspace"), Path("/tmp/project")]
@@ -37,6 +37,7 @@ class TestPathConfirmationPersistence:
         session_dir.mkdir(parents=True)
 
         import wolo.session
+
         monkeypatch.setattr(wolo.session, "get_session_dir", lambda sid: session_dir)
 
         save_path_confirmations("format_test", [Path("/workspace")])
@@ -55,6 +56,7 @@ class TestPathConfirmationPersistence:
         session_dir.mkdir(parents=True)
 
         import wolo.session
+
         monkeypatch.setattr(wolo.session, "get_session_dir", lambda sid: session_dir)
 
         loaded = load_path_confirmations("nonexistent")
@@ -64,8 +66,8 @@ class TestPathConfirmationPersistence:
 class TestSessionResumeWithConfirmations:
     def test_resume_loads_confirmations_to_pathguard(self, tmp_path, monkeypatch):
         """Resuming a session should load confirmations into PathGuard"""
-        from wolo.path_guard import PathGuard, set_path_guard, reset_path_guard, Operation
         import wolo.session
+        from wolo.path_guard import Operation, PathGuard, reset_path_guard, set_path_guard
 
         # Setup mock session directory
         session_dir = tmp_path / "sessions" / "resume_test"
@@ -93,8 +95,8 @@ class TestSessionResumeWithConfirmations:
 class TestSaveConfirmationsOnExit:
     def test_saves_on_session_save(self, tmp_path, monkeypatch):
         """Saving session should also save path confirmations"""
-        from wolo.path_guard import PathGuard, set_path_guard, reset_path_guard
         import wolo.session
+        from wolo.path_guard import PathGuard, reset_path_guard, set_path_guard
 
         session_dir = tmp_path / "sessions" / "save_test"
         session_dir.mkdir(parents=True)
@@ -108,6 +110,7 @@ class TestSaveConfirmationsOnExit:
 
         # Save confirmations
         from wolo.path_guard import get_path_guard
+
         confirmed = get_path_guard().get_confirmed_dirs()
         wolo.session.save_path_confirmations("save_test", confirmed)
 

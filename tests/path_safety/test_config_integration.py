@@ -1,6 +1,6 @@
 # tests/path_safety/test_config_integration.py
-import pytest
 from pathlib import Path
+
 from wolo.config import PathSafetyConfig
 
 
@@ -21,7 +21,7 @@ class TestPathSafetyConfig:
             allowed_write_paths=[Path("/workspace"), Path("/tmp")],
             max_confirmations_per_session=20,
             audit_denied=False,
-            audit_log_file=custom_path
+            audit_log_file=custom_path,
         )
 
         assert len(config.allowed_write_paths) == 2

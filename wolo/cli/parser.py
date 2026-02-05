@@ -22,14 +22,10 @@ SHORT_OPTIONS = {
     "-r": "--resume",
     "-l": "--list",
     "-w": "--watch",
-    "-S": "--save",
     "-h": "--help",
     "-a": "--agent",
-    "-b": "--baseurl",
     "-m": "--model",
-    "-L": "--log-level",
     "-n": "--max-steps",
-    "-O": "--output-style",
     "-C": "--workdir",
     "-P": "--allow-path",
 }
@@ -44,12 +40,10 @@ OPTIONS_NEEDING_VALUE = {
     "-w",
     "--agent",
     "-a",
-    "--baseurl",
-    "-b",
+    "--base-url",
     "--model",
     "-m",
     "--log-level",
-    "-L",
     "--max-steps",
     "-n",
     "--api-key",
@@ -57,7 +51,6 @@ OPTIONS_NEEDING_VALUE = {
     "--debug-full",
     "--benchmark-output",
     "--output-style",
-    "-O",
     "--workdir",
     "-C",
     "--allow-path",
@@ -70,7 +63,7 @@ OUTPUT_STYLE_CHOICES = {"minimal", "default", "verbose"}
 # Mutually exclusive option groups
 MUTUALLY_EXCLUSIVE_GROUPS = [
     # Execution modes (only one allowed)
-    {"--solo", "--coop"},
+    {"--solo", "--coop", "--repl"},
     # Session creation vs resume (can't do both)
     {"--session", "-s", "--resume", "-r"},
 ]
@@ -80,13 +73,6 @@ MULTI_VALUE_OPTIONS = {
     "--allow-path",
     "-P",
     "allow-path",
-}
-
-# Deprecated options with migration hints
-DEPRECATED_OPTIONS = {
-    "--silent": ("--solo", "Use --solo instead of --silent"),
-    "--interactive": ("--coop", "Use --coop instead of --interactive"),
-    "--prompt-file": (None, "Use 'cat FILE | wolo' instead of --prompt-file"),
 }
 
 # Template for combining pipe input with CLI prompt
@@ -217,25 +203,6 @@ def validate_option_conflicts(options: dict) -> tuple[bool, str]:
     return (True, "")
 
 
-def check_deprecated_options(options: dict) -> list[str]:
-    """
-    Check for deprecated options and return warning messages.
-
-    Args:
-        options: Parsed options dictionary
-
-    Returns:
-        List of deprecation warning messages
-    """
-    warnings = []
-    for opt, (replacement, message) in DEPRECATED_OPTIONS.items():
-        key_with_prefix = opt
-        key_without_prefix = opt.lstrip("-")
-        if key_with_prefix in options or key_without_prefix in options:
-            warnings.append(f"Warning: {message}")
-    return warnings
-
-
 class FlexibleArgumentParser:
     """
     Flexible argument parser supporting:
@@ -338,7 +305,9 @@ class FlexibleArgumentParser:
                         options[option_expecting_value].append(arg)
                         # Also store with -- prefix for lookup
                         if not option_expecting_value.startswith("--"):
-                            long_opt = SHORT_OPTIONS.get(option_expecting_value, f"--{option_expecting_value}")
+                            long_opt = SHORT_OPTIONS.get(
+                                option_expecting_value, f"--{option_expecting_value}"
+                            )
                             if long_opt not in options:
                                 options[long_opt] = []
                             options[long_opt].append(arg)
@@ -356,11 +325,6 @@ class FlexibleArgumentParser:
         # Handle last option expecting value
         if option_expecting_value:
             options[option_expecting_value] = None
-
-        # Check for deprecated options and print warnings
-        deprecation_warnings = check_deprecated_options(options)
-        for warning in deprecation_warnings:
-            print(warning, file=sys.stderr)
 
         # Apply options to result
         self._apply_options(result, options)
@@ -441,24 +405,21 @@ class FlexibleArgumentParser:
         if "--watch" in options or "-w" in options:
             result.session_options.watch_id = options.get("--watch") or options.get("-w")
 
-        # Execution mode: --solo / --coop (new), with backward compatibility
+        # Execution mode: --solo / --coop / --repl
         if "--solo" in options or "solo" in options:
             result.execution_options.mode = ExecutionMode.SOLO
         elif "--coop" in options or "coop" in options:
             result.execution_options.mode = ExecutionMode.COOP
-        # Backward compatibility: map old options to new
-        elif "--silent" in options or "silent" in options:
-            result.execution_options.mode = ExecutionMode.SOLO
-        elif "--interactive" in options or "interactive" in options:
-            result.execution_options.mode = ExecutionMode.COOP
+        elif "--repl" in options or "repl" in options:
+            result.execution_options.mode = ExecutionMode.REPL
         # Default is SOLO (set in ExecutionOptions dataclass)
 
         if "--agent" in options or "-a" in options:
             result.execution_options.agent_type = (
                 options.get("--agent") or options.get("-a") or "general"
             )
-        if "--baseurl" in options or "-b" in options:
-            result.execution_options.base_url = options.get("--baseurl") or options.get("-b")
+        if "--base-url" in options or "base-url" in options:
+            result.execution_options.base_url = options.get("--base-url") or options.get("base-url")
         if "--model" in options or "-m" in options:
             result.execution_options.model = options.get("--model") or options.get("-m")
         if "--max-steps" in options or "-n" in options:
@@ -468,9 +429,9 @@ class FlexibleArgumentParser:
                     result.execution_options.max_steps = int(max_steps_val)
             except (ValueError, TypeError):
                 pass
-        if "--log-level" in options or "-L" in options:
-            result.execution_options.log_level = options.get("--log-level") or options.get("-L")
-        if "--save" in options or "-S" in options:
+        if "--log-level" in options or "log-level" in options:
+            result.execution_options.log_level = options.get("--log-level") or options.get("log-level")
+        if "--save" in options or "save" in options:
             result.execution_options.save_session = True
         if "--benchmark" in options:
             result.execution_options.benchmark_mode = True
@@ -484,8 +445,8 @@ class FlexibleArgumentParser:
             result.execution_options.api_key = options.get("--api-key")
 
         # Output style options
-        if "--output-style" in options or "-O" in options:
-            style = options.get("--output-style") or options.get("-O")
+        if "--output-style" in options or "output-style" in options:
+            style = options.get("--output-style") or options.get("output-style")
             if style and style in OUTPUT_STYLE_CHOICES:
                 result.execution_options.output_style = style
         if "--no-color" in options or "no-color" in options:

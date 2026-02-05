@@ -52,27 +52,6 @@ def test_route_subcommand_config():
     assert remaining == ["list-endpoints"]
 
 
-def test_route_subcommand_debug():
-    """Test routing debug subcommand."""
-    command_type, remaining = _route_command(["debug", "llm"], False)
-    assert command_type == "debug"
-    assert remaining == ["llm"]
-
-
-def test_route_subcommand_run_deprecated():
-    """Test routing run subcommand (deprecated, now routes to execute)."""
-    command_type, remaining = _route_command(["run", "message"], False)
-    assert command_type == "execute"  # Changed: run is deprecated
-    assert remaining == ["message"]
-
-
-def test_route_subcommand_repl():
-    """Test routing repl subcommand."""
-    command_type, remaining = _route_command(["repl"], False)
-    assert command_type == "repl"
-    assert remaining == []
-
-
 def test_route_subcommand_chat():
     """Test routing chat subcommand (synonym for repl)."""
     command_type, remaining = _route_command(["chat"], False)

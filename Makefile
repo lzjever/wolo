@@ -84,10 +84,10 @@ benchmark-all:
 	$(PYTHON_CMD) -m wolo.tests.benchmark
 
 test:
-	$(PYTHON_CMD) -m pytest tests/ wolo/tests/ -v -n auto
+	$(PYTHON_CMD) -m pytest tests/ -v -n auto
 
 test-cov:
-	$(PYTHON_CMD) -m pytest tests/ wolo/tests/ -v -n auto --cov=wolo --cov-report=html --cov-report=term
+	$(PYTHON_CMD) -m pytest tests/ -v -n auto --cov=wolo --cov-report=html --cov-report=term
 
 lint:
 	$(PYTHON_CMD) -m ruff check wolo/ tests/ --output-format=concise --no-fix

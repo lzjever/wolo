@@ -1,7 +1,10 @@
 # tests/path_safety/test_path_guard.py
-import pytest
 from pathlib import Path
-from wolo.path_guard import PathGuard, Operation, reset_path_guard
+
+import pytest
+
+from wolo.path_guard import Operation, PathGuard, reset_path_guard
+
 
 @pytest.fixture(autouse=True)
 def reset_guard():
@@ -9,6 +12,7 @@ def reset_guard():
     reset_path_guard()
     yield
     reset_path_guard()
+
 
 class TestPathGuardBasics:
     def test_default_only_allows_tmp(self):
@@ -92,12 +96,12 @@ class TestPathGuardBasics:
         assert result.requires_confirmation is True
 
 
-class TestPathConfirmationRequired:
+class TestPathConfirmationRequiredError:
     def test_exception_attributes(self):
         """Exception should store path and operation"""
-        from wolo.path_guard_exceptions import PathConfirmationRequired
+        from wolo.path_guard_exceptions import PathConfirmationRequiredError
 
-        exc = PathConfirmationRequired("/workspace/test.txt", "write")
+        exc = PathConfirmationRequiredError("/workspace/test.txt", "write")
 
         assert exc.path == "/workspace/test.txt"
         assert exc.operation == "write"

@@ -56,12 +56,11 @@ class PathSafetyConfig:
         audit_denied: Whether to audit denied operations
         audit_log_file: Path to audit log file
     """
+
     allowed_write_paths: list[Path] = field(default_factory=list)
     max_confirmations_per_session: int = 10
     audit_denied: bool = True
-    audit_log_file: Path = field(
-        default_factory=lambda: Path.home() / ".wolo" / "path_audit.log"
-    )
+    audit_log_file: Path = field(default_factory=lambda: Path.home() / ".wolo" / "path_audit.log")
 
 
 @dataclass
@@ -76,11 +75,6 @@ class Config:
     debug_full_dir: str | None = None  # Directory to save full request/response logs
     enable_think: bool = (
         False  # Enable reasoning mode for compatible models (OpenAI o1, DeepSeek-R1, etc.)
-    )
-
-    # ✅ NEW: Lexilux migration flag
-    use_lexilux_client: bool = (
-        False  # Use lexilux-based LLM client instead of legacy implementation
     )
 
     # Claude compatibility
@@ -364,15 +358,6 @@ class Config:
         if not enable_think:
             enable_think = os.getenv("WOLO_ENABLE_THINK", "").lower() in ("true", "1", "yes")
 
-        # ✅ Load use_lexilux_client from config or env
-        use_lexilux_client = config_data.get("use_lexilux_client", False)
-        if not use_lexilux_client:
-            use_lexilux_client = os.getenv("WOLO_USE_LEXILUX_CLIENT", "").lower() in (
-                "true",
-                "1",
-                "yes",
-            )
-
         # Load compaction config
         from wolo.compaction.config import load_compaction_config
 
@@ -382,12 +367,8 @@ class Config:
         # Load path safety config
         path_safety_data = config_data.get("path_safety", {})
         path_safety_config = PathSafetyConfig(
-            allowed_write_paths=[
-                Path(p) for p in path_safety_data.get("allowed_write_paths", [])
-            ],
-            max_confirmations_per_session=path_safety_data.get(
-                "max_confirmations_per_session", 10
-            ),
+            allowed_write_paths=[Path(p) for p in path_safety_data.get("allowed_write_paths", [])],
+            max_confirmations_per_session=path_safety_data.get("max_confirmations_per_session", 10),
             audit_denied=path_safety_data.get("audit_denied", True),
             audit_log_file=Path(path_safety_data.get("audit_log_file"))
             if path_safety_data.get("audit_log_file")
@@ -402,7 +383,6 @@ class Config:
             max_tokens=max_tokens,
             mcp_servers=mcp_servers,
             enable_think=enable_think,
-            use_lexilux_client=use_lexilux_client,  # ✅ NEW: Include lexilux client flag
             claude=claude_config,
             mcp=mcp_config,
             compaction=compaction_config,

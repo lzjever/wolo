@@ -137,6 +137,10 @@ wolo.log
 benchmark_results.json
 *.log
 
+# Development test artifacts (not part of main test suite)
+/mytest/
+/migration_tests/
+
 # Claude Code
 .claude/ralph-loop.local.md
 

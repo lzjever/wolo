@@ -2,7 +2,7 @@
 """Exceptions raised by PathGuard."""
 
 
-class PathConfirmationRequired(Exception):
+class PathConfirmationRequiredError(Exception):
     """Raised when a path operation requires user confirmation.
 
     This exception is raised by write tools when the target path
@@ -17,3 +17,7 @@ class PathConfirmationRequired(Exception):
         self.path = path
         self.operation = operation
         super().__init__(f"Path confirmation required for {operation} on {path}")
+
+
+# Backward compatibility alias (deprecated)
+PathConfirmationRequired = PathConfirmationRequiredError

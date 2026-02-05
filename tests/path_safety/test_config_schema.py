@@ -1,6 +1,5 @@
 # tests/path_safety/test_config_schema.py
 from wolo.config_schema import get_config_schema
-from wolo.config import PathSafetyConfig
 
 
 class TestPathSafetySchema:

@@ -130,38 +130,30 @@ class TestConfigFromEnvBaseUrl:
 
 
 class TestParserBaseUrl:
-    """Test parser for --baseurl option."""
+    """Test parser for --base-url option."""
 
-    def test_parse_baseurl_long_form(self):
-        """Test parsing --baseurl option."""
+    def test_parse_base_url_long_form(self):
+        """Test parsing --base-url option."""
         parser = FlexibleArgumentParser()
-        args = parser.parse(["--baseurl", "https://api.example.com/v1", "message"])
+        args = parser.parse(["--base-url", "https://api.example.com/v1", "message"])
 
         assert args.execution_options.base_url == "https://api.example.com/v1"
         assert args.message == "message"
 
-    def test_parse_baseurl_short_form(self):
-        """Test parsing -b option."""
+    def test_parse_base_url_with_equals(self):
+        """Test parsing --base-url=value syntax."""
         parser = FlexibleArgumentParser()
-        args = parser.parse(["-b", "https://api.example.com/v1", "message"])
+        args = parser.parse(["--base-url=https://api.example.com/v1", "message"])
 
         assert args.execution_options.base_url == "https://api.example.com/v1"
         assert args.message == "message"
 
-    def test_parse_baseurl_with_equals(self):
-        """Test parsing --baseurl=value syntax."""
-        parser = FlexibleArgumentParser()
-        args = parser.parse(["--baseurl=https://api.example.com/v1", "message"])
-
-        assert args.execution_options.base_url == "https://api.example.com/v1"
-        assert args.message == "message"
-
-    def test_parse_baseurl_with_model_and_api_key(self):
+    def test_parse_base_url_with_model_and_api_key(self):
         """Test parsing all three required options together."""
         parser = FlexibleArgumentParser()
         args = parser.parse(
             [
-                "--baseurl",
+                "--base-url",
                 "https://api.example.com/v1",
                 "--model",
                 "test-model",

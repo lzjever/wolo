@@ -1,7 +1,7 @@
 # tests/path_safety/test_cli_integration.py
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import patch
+
 from wolo.cli.parser import FlexibleArgumentParser
 from wolo.path_guard import PathGuard
 
@@ -17,11 +17,9 @@ class TestAllowPathArgument:
     def test_multiple_allow_paths(self):
         """Should parse multiple --allow-path arguments"""
         parser = FlexibleArgumentParser()
-        args = parser.parse([
-            "--allow-path", "/workspace",
-            "--allow-path", "/var/tmp",
-            "test prompt"
-        ])
+        args = parser.parse(
+            ["--allow-path", "/workspace", "--allow-path", "/var/tmp", "test prompt"]
+        )
 
         assert len(args.execution_options.allowed_paths) == 2
         assert "/workspace" in args.execution_options.allowed_paths
@@ -45,8 +43,8 @@ class TestAllowPathArgument:
 class TestPathGuardInitialization:
     def test_initializes_with_config_paths(self):
         """PathGuard should be initialized with config paths"""
-        from wolo.config import Config, PathSafetyConfig
         from wolo.cli.main import _initialize_path_guard
+        from wolo.config import Config, PathSafetyConfig
 
         config = Config(
             api_key="test",
@@ -54,12 +52,10 @@ class TestPathGuardInitialization:
             base_url="https://test.com",
             temperature=0.7,
             max_tokens=16384,
-            path_safety=PathSafetyConfig(
-                allowed_write_paths=[Path("/workspace")]
-            )
+            path_safety=PathSafetyConfig(allowed_write_paths=[Path("/workspace")]),
         )
 
-        with patch('wolo.path_guard.set_path_guard') as mock_set:
+        with patch("wolo.path_guard.set_path_guard") as mock_set:
             _initialize_path_guard(config, [])
 
             mock_set.assert_called_once()
@@ -68,8 +64,8 @@ class TestPathGuardInitialization:
 
     def test_initializes_with_cli_paths(self):
         """PathGuard should include CLI-provided paths"""
-        from wolo.config import Config
         from wolo.cli.main import _initialize_path_guard
+        from wolo.config import Config
 
         config = Config(
             api_key="test",
@@ -79,15 +75,15 @@ class TestPathGuardInitialization:
             max_tokens=16384,
         )
 
-        with patch('wolo.path_guard.set_path_guard') as mock_set:
+        with patch("wolo.path_guard.set_path_guard") as mock_set:
             _initialize_path_guard(config, ["/workspace", "/var/tmp"])
 
             mock_set.assert_called_once()
 
     def test_initializes_with_workdir(self):
         """PathGuard should include working directory with highest priority"""
-        from wolo.config import Config
         from wolo.cli.main import _initialize_path_guard
+        from wolo.config import Config
 
         config = Config(
             api_key="test",
@@ -97,7 +93,7 @@ class TestPathGuardInitialization:
             max_tokens=16384,
         )
 
-        with patch('wolo.path_guard.set_path_guard') as mock_set:
+        with patch("wolo.path_guard.set_path_guard") as mock_set:
             workdir = "/custom/workdir"
             _initialize_path_guard(config, [], None, workdir)
 
@@ -108,8 +104,8 @@ class TestPathGuardInitialization:
 
     def test_workdir_allows_operations_within_it(self):
         """Operations within workdir should be allowed without confirmation"""
-        from wolo.config import Config
         from wolo.cli.main import _initialize_path_guard
+        from wolo.config import Config
         from wolo.path_guard import Operation, get_path_guard
 
         config = Config(

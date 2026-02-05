@@ -5,10 +5,8 @@ This module handles command routing and dispatches to appropriate handlers.
 """
 
 import sys
-from pathlib import Path
 
 from wolo.cli.commands.config import ConfigCommandGroup
-from wolo.cli.commands.debug import DebugCommandGroup
 from wolo.cli.commands.repl import ReplCommand
 from wolo.cli.commands.run import RunCommand
 from wolo.cli.commands.session import SessionCommandGroup
@@ -40,12 +38,12 @@ def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
     """
     Route command to appropriate handler.
 
-    ROUTING PRIORITY (STRICT ORDER - DO NOT MODIFY):
+    ROUTING PRIORITY (STRICT ORDER):
     1. Help: -h, --help (highest priority)
     2. Quick commands: -l, -w
-    3. Subcommands: session, config, debug
-    4. REPL entry: chat, repl
-    5. Deprecated: run (shows warning, still works)
+    3. Mode flags: --repl (routes to REPL mode)
+    4. Subcommands: session, config
+    5. REPL entry: chat
     6. Execution: prompt provided (CLI or stdin)
     7. Default: show brief help (no input)
 
@@ -79,7 +77,13 @@ def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
                 return ("error", ["watch requires session id"])
             return ("session_watch", [args[1]])
 
-    # 3. Check for empty args
+    # 3. Mode flags: --repl routes to REPL mode (can have optional initial prompt)
+    if "--repl" in args:
+        # Remove --repl from args and route to repl command
+        remaining = [a for a in args if a != "--repl"]
+        return ("repl", remaining)
+
+    # 4. Check for empty args
     if not args:
         if has_stdin:
             # Stdin input with no args means execution mode
@@ -89,25 +93,15 @@ def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
 
     first = args[0]
 
-    # 4. Subcommands
+    # 5. Subcommands
     if first == "session":
         return ("session", args[1:])
     if first == "config":
         return ("config", args[1:])
-    if first == "debug":
-        return ("debug", args[1:])
 
-    # 5. REPL entry: chat and repl are synonyms
-    if first in ("chat", "repl"):
+    # 6. REPL entry: 'chat' command
+    if first == "chat":
         return ("repl", args[1:])
-
-    # 6. Deprecated: run command (still works but shows warning)
-    if first == "run":
-        print(
-            "Warning: The 'run' command is deprecated. Use 'wolo \"prompt\"' directly.",
-            file=sys.stderr,
-        )
-        return ("execute", args[1:])
 
     # 7. Execution mode: has prompt (args) or stdin
     if has_stdin or args:
@@ -127,18 +121,21 @@ def _show_brief_help() -> int:
     print("""Wolo - AI Agent CLI
 
 Usage:
-  wolo "your prompt"                    Execute a task
+  wolo "your prompt"                    Execute task (solo mode, default)
+  wolo --coop "your prompt"             Execute with AI questions enabled
+  wolo --repl                           Start interactive conversation
+  wolo --repl "initial prompt"          REPL with initial message
   cat file | wolo "analyze this"        Context + prompt
-  wolo chat                             Start interactive session
-  wolo -r <id> "continue"               Resume session
 
-Quick commands:
+Session:
+  wolo -r <id>                          Resume session (REPL mode)
+  wolo -r <id> --solo "prompt"          Resume session (one-shot)
   wolo -l                               List sessions
   wolo -w <id>                          Watch running session
-  wolo -h                               Full help
 
-Configuration:
-  wolo config init            Initialize configuration (first-time setup)
+More:
+  wolo -h                               Full help
+  wolo config init                      First-time setup
 
 Examples:
   wolo "fix the bug in main.py"
@@ -167,6 +164,7 @@ def _initialize_path_guard(
         workdir: Optional working directory path (automatically allowed if set)
     """
     from pathlib import Path as PathLib
+
     from wolo.path_guard import PathGuard, set_path_guard
     from wolo.session import load_path_confirmations
 
@@ -246,13 +244,12 @@ def main() -> int:
     # Validate option conflicts after parsing
     # Build options dict from parsed for conflict check
     options_for_check = {}
-    if parsed.execution_options.mode.value == "solo":
-        # Check if --solo was explicitly set vs default
-        # We need to check the original args for explicit flags
-        if "--solo" in args or "solo" in args:
-            options_for_check["--solo"] = True
-    if "--coop" in args or "coop" in args:
+    if "--solo" in args:
+        options_for_check["--solo"] = True
+    if "--coop" in args:
         options_for_check["--coop"] = True
+    if "--repl" in args:
+        options_for_check["--repl"] = True
     if parsed.session_options.session_name is not None:
         options_for_check["--session"] = True
     if parsed.session_options.resume_id is not None:
@@ -263,8 +260,16 @@ def main() -> int:
         print(error_msg, file=sys.stderr)
         return ExitCode.ERROR
 
+    # Handle -r/--resume: default to REPL mode unless --solo is explicit
+    if parsed.session_options.resume_id is not None:
+        from wolo.modes import ExecutionMode
+
+        if "--solo" not in args:
+            # Resume defaults to REPL mode
+            parsed.execution_options.mode = ExecutionMode.REPL
+
     # Extract subcommand for command groups
-    if command_type in ("session", "config", "debug") and remaining_args:
+    if command_type in ("session", "config") and remaining_args:
         # Set subcommand from remaining_args (before parsing removes it)
         parsed.subcommand = remaining_args[0]
         # The parser may have already added it to positional_args, remove it
@@ -279,19 +284,22 @@ def main() -> int:
 
     # Execute command
     if command_type == "execute":
+        from wolo.modes import ExecutionMode
+
+        # If mode is REPL (from --resume without --solo), use ReplCommand
+        if parsed.execution_options.mode == ExecutionMode.REPL:
+            return ReplCommand().execute(parsed)
         return RunCommand().execute(parsed)
     elif command_type == "repl":
         from wolo.modes import ExecutionMode
 
-        # Set mode to REPL for chat/repl command
+        # Set mode to REPL for chat command
         parsed.execution_options.mode = ExecutionMode.REPL
         return ReplCommand().execute(parsed)
     elif command_type == "session":
         return SessionCommandGroup().execute(parsed)
     elif command_type == "config":
         return ConfigCommandGroup().execute(parsed)
-    elif command_type == "debug":
-        return DebugCommandGroup().execute(parsed)
 
     # Unknown command type
     print(f"Error: Unknown command type: {command_type}", file=sys.stderr)

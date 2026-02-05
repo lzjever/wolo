@@ -10,9 +10,14 @@ from pathlib import Path
 from rich.console import Console
 
 
-class SessionCancelled(Exception):
+class SessionCancelledError(Exception):
     """Raised when user cancels the session during confirmation."""
+
     pass
+
+
+# Backward compatibility alias (deprecated)
+SessionCancelled = SessionCancelledError
 
 
 async def handle_path_confirmation(path: str, operation: str) -> bool:
@@ -26,12 +31,12 @@ async def handle_path_confirmation(path: str, operation: str) -> bool:
         True if user allowed the operation, False if denied
 
     Raises:
-        SessionCancelled: If user enters 'q' to quit
+        SessionCancelledError: If user enters 'q' to quit
     """
     from wolo.path_guard import get_path_guard
 
     console = Console()
-    console.print(f"\n⚠️  [yellow]Path Confirmation Required[/yellow]")
+    console.print("\n⚠️  [yellow]Path Confirmation Required[/yellow]")
     console.print(f"Operation: [cyan]{operation}[/cyan]")
     console.print(f"Path: [cyan]{path}[/cyan]")
     console.print("This path is not in the default allowlist (/tmp) or configured whitelist.")
@@ -42,7 +47,9 @@ async def handle_path_confirmation(path: str, operation: str) -> bool:
         return False
 
     while True:
-        response = console.input("\n[yellow]Allow this operation?[/yellow] [Y/n/a/q] ").strip().lower()
+        response = (
+            console.input("\n[yellow]Allow this operation?[/yellow] [Y/n/a/q] ").strip().lower()
+        )
 
         if response in ("", "y", "yes"):
             guard = get_path_guard()
@@ -54,10 +61,12 @@ async def handle_path_confirmation(path: str, operation: str) -> bool:
             guard = get_path_guard()
             parent = Path(path).parent
             guard.confirm_directory(parent)
-            console.print(f"[green]✓[/green] {parent} and subdirectories added to session whitelist")
+            console.print(
+                f"[green]✓[/green] {parent} and subdirectories added to session whitelist"
+            )
             return True
         elif response == "q":
             console.print("[red]Session cancelled[/red]")
-            raise SessionCancelled()
+            raise SessionCancelledError()
         else:
             console.print("[dim]Please enter Y/n/a/q[/dim]")

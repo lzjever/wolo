@@ -27,7 +27,7 @@ from wolo.errors import WoloAPIError
 
 logger = logging.getLogger(__name__)
 
-# Global token usage tracking (compatibility with original implementation)
+# Global token usage tracking
 _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
@@ -348,28 +348,22 @@ class WoloLLMClient:
         """获取最后完成的原因."""
         return self._finish_reason
 
-    # Compatibility methods (match original GLMClient interface)
     @classmethod
     async def close_all_sessions(cls):
-        """
-        Close all sessions (compatibility method).
+        """Close all sessions.
 
-        Note: lexilux no longer uses connection pooling. Each HTTP request
-        creates a new connection and closes it after completion. This method
-        is kept for backward compatibility with code that expects GLMClient interface.
+        Note: lexilux uses direct HTTP requests without connection pooling,
+        so no cleanup is needed. This method exists for API consistency.
         """
-        # lexilux uses direct HTTP requests (no connection pooling)
-        # No cleanup needed, but keep method for compatibility
         logger.debug("Connection cleanup not needed (lexilux uses direct HTTP requests)")
 
 
-# ✅ 保持与原 GLMClient 兼容的函数
 def get_token_usage() -> dict[str, int]:
-    """Get token usage from last API call (compatibility function)."""
+    """Get token usage from last API call."""
     return _api_token_usage.copy()
 
 
 def reset_token_usage() -> None:
-    """Reset token usage tracking (compatibility function)."""
+    """Reset token usage tracking."""
     global _api_token_usage
     _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

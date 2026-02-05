@@ -32,12 +32,7 @@ def show_help(args: ParsedArgs) -> int:
             show_subcommand_help("config", help_context[1])
         else:
             show_command_help("config")
-    elif help_context[0] == "debug":
-        if len(help_context) > 1:
-            show_subcommand_help("debug", help_context[1])
-        else:
-            show_command_help("debug")
-    elif help_context[0] in ("chat", "repl"):
+    elif help_context[0] == "chat":
         show_command_help("chat")
     else:
         show_main_help()
@@ -51,24 +46,33 @@ def show_main_help() -> None:
 
 USAGE:
     wolo [OPTIONS] [PROMPT]
-    wolo chat|repl [OPTIONS]
+    wolo chat [OPTIONS]
     wolo session <SUBCOMMAND>
     wolo config <SUBCOMMAND>
 
+EXECUTION MODES:
+    (none)          SOLO mode (default): autonomous execution, no questions
+                    Best for: scripts, automation, batch processing
+
+    --coop          COOP mode: cooperative execution, AI may ask questions
+                    Best for: complex tasks needing user guidance
+
+    --repl          REPL mode: continuous conversation, loops for input
+                    Best for: interactive exploration, debugging
+
 BASIC USAGE:
     wolo "your prompt"                    Execute task (solo mode)
+    wolo --coop "your prompt"             Execute with questions enabled
+    wolo --repl                           Start interactive REPL
+    wolo --repl "initial prompt"          REPL with initial message
+    wolo chat                             Same as --repl
     cat file | wolo "do X"                Context + prompt
-    wolo chat                             Start interactive REPL
-    wolo -r <id> "continue"               Resume session with prompt
-    wolo session resume <id>              Resume session in REPL
-
-EXECUTION MODES:
-    --solo          Solo mode: autonomous, no questions (default)
-    --coop          Coop mode: AI may ask clarifying questions
 
 SESSION OPTIONS:
     -s, --session <name>    Create/use named session
-    -r, --resume <id>       Resume session (requires prompt)
+    -r, --resume <id>       Resume session (REPL mode by default)
+    -r, --resume <id> --solo "prompt"
+                            Resume session (one-shot execution)
 
 QUICK COMMANDS:
     -l, --list              List all sessions
@@ -77,63 +81,52 @@ QUICK COMMANDS:
 
 OTHER OPTIONS:
     -a, --agent <type>      Agent: general, plan, explore, compaction
-    -b, --baseurl <url>     LLM service base URL (direct, bypasses config file)
-    -m, --model <model>     Model name (required if using --baseurl)
+    --base-url <url>        LLM service base URL (direct, bypasses config)
+    -m, --model <model>     Model name (required if using --base-url)
+    --api-key <key>         API key (required if using --base-url)
     -n, --max-steps <n>     Max steps (default: 100)
-    -L, --log-level <lvl>   DEBUG, INFO, WARNING, ERROR
-    -S, --save              Force save session on completion
-    -C, --workdir <path>    Working directory for file operations (automatically whitelisted)
-    -P, --allow-path <path> Add path to whitelist (can be used multiple times)
-    --api-key <key>         API key (required if using --baseurl)
+    --log-level <lvl>       DEBUG, INFO, WARNING, ERROR
+    --save                  Force save session on completion
+    -C, --workdir <path>    Working directory (automatically whitelisted)
+    -P, --allow-path <path> Add path to whitelist (repeatable)
 
-    If --baseurl is specified, all three (--baseurl, --model, --api-key) are required.
+    If --base-url is specified, all three (--base-url, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
 
 PATH PROTECTION:
-    Wolo uses whitelist-based path protection to ensure safe file operations.
+    Wolo uses whitelist-based path protection for safe file operations.
     By default, only the working directory (if set via -C) and /tmp are allowed.
 
     Path Whitelist Priority (highest to lowest):
-        1. Working directory (-C/--workdir) - automatically allowed, highest priority
+        1. Working directory (-C/--workdir) - highest priority
         2. CLI whitelist paths (-P/--allow-path)
         3. Config file whitelist (path_safety.allowed_write_paths)
         4. Default allowed (/tmp)
 
     Examples:
         wolo -C /path/to/project "modify files"
-            Allows all operations within /path/to/project
-
-        wolo -C /path/to/project -P /home/user/docs "modify files"
-            Allows operations in /path/to/project AND /home/user/docs
-
-        wolo "modify files"
-            Requires confirmation for paths outside /tmp
-
-    Configuration file whitelist (~/.wolo/config.yaml):
-        path_safety:
-          allowed_write_paths:
-            - /home/user/projects
-            - /home/user/documents
+        wolo -C /project -P /home/user/docs "modify files"
 
 OUTPUT OPTIONS:
-    -O, --output-style <s>  Output style: minimal (no color), default, verbose
+    --output-style <s>      Output style: minimal, default, verbose
     --no-color              Disable color output
     --show-reasoning        Show model reasoning/thinking
     --hide-reasoning        Hide model reasoning/thinking
-    --json                  JSON output (implies --output-style=minimal)
+    --json                  JSON output (implies minimal style)
 
 DEBUG OPTIONS:
     --debug-llm <file>      Log LLM requests/responses
     --debug-full <dir>      Save full JSON request/response
     --benchmark             Enable benchmark mode
-    --benchmark-output <f>  Benchmark output file (default: benchmark_results.json)
+    --benchmark-output <f>  Benchmark output file
 
 EXAMPLES:
     wolo "fix the bug in main.py"
     git diff | wolo "write commit message"
     wolo --coop "design login feature"
-    wolo -s myproject "implement auth"
-    wolo -r myproject "add tests"
+    wolo --repl "let's explore the codebase"
+    wolo -r mysession                        # Resume in REPL
+    wolo -r mysession --solo "add tests"     # Resume one-shot
 
 SESSION MANAGEMENT:
     wolo session list               List sessions
@@ -173,19 +166,21 @@ SUBCOMMANDS:
 QUICK OPTIONS:
     wolo -l                  Same as: wolo session list
     wolo -w <id>             Same as: wolo session watch <id>
-    wolo -r <id> "prompt"    Resume with prompt (one-shot, not REPL)
+    wolo -r <id>             Resume session (REPL mode, default)
+    wolo -r <id> --solo "p"  Resume session (one-shot execution)
 
 EXAMPLES:
     wolo session list
     wolo session show myproject
     wolo session resume myproject           # Enter REPL
-    wolo -r myproject "continue work"       # One-shot execution
-    echo "task" | wolo session resume myproject   # REPL with initial message
+    wolo -r myproject                       # Same as above
+    wolo -r myproject --solo "add tests"    # One-shot execution
+    echo "task" | wolo -r myproject         # REPL with initial message
 
 NOTE:
     - 'session show' displays info and exits (non-blocking)
-    - 'session resume' enters REPL mode (blocking, interactive)
-    - Use '-r' for one-shot execution with a new prompt
+    - 'session resume' and '-r' both enter REPL mode by default
+    - Use '-r <id> --solo "prompt"' for one-shot execution
 """
         print(help_text)
     elif command == "config":
@@ -209,61 +204,28 @@ EXAMPLES:
     wolo config example
 """
         print(help_text)
-    elif command == "debug":
-        help_text = """Debugging Tools
-
-USAGE:
-    wolo debug <subcommand> [options]
-
-SUBCOMMANDS:
-    llm <file>       Show usage for LLM debugging (use --debug-llm flag instead)
-    full <dir>       Show usage for full debug (use --debug-full flag instead)
-    benchmark        Show usage for benchmark mode (use --benchmark flag instead)
-
-Note: Debug options are typically used as execution flags:
-
-    wolo --debug-llm <file> "your prompt"
-        Log LLM requests/responses to file
-
-    wolo --debug-full <dir> "your prompt"
-        Save full JSON request/response to directory
-
-    wolo --benchmark "your prompt"
-        Enable benchmark mode and export metrics
-
-    wolo --benchmark --benchmark-output <file> "your prompt"
-        Enable benchmark mode with custom output file
-
-EXAMPLES:
-    wolo --debug-llm llm.log "fix bug"
-    wolo --debug-full ./debug "implement feature"
-    wolo --benchmark "run tests"
-    wolo --benchmark --benchmark-output custom.json "run tests"
-"""
-        print(help_text)
-    elif command in ("chat", "repl"):
-        help_text = """Wolo REPL - Interactive Conversation Mode
+    elif command == "chat":
+        help_text = """Wolo Chat - Interactive Conversation Mode
 
 USAGE:
     wolo chat [OPTIONS]
-    wolo repl [OPTIONS]
+    wolo --repl [OPTIONS] [PROMPT]
 
 DESCRIPTION:
     Start an interactive REPL session. The agent will respond to each
     message and wait for your next input.
 
-    'chat' and 'repl' are synonyms.
+    'wolo chat' and 'wolo --repl' are equivalent.
 
 OPTIONS:
-    --coop              Enable AI questions (default in REPL)
     -s, --session <n>   Use named session
     -a, --agent <type>  Agent type
-    -b, --baseurl <url> LLM service base URL (direct, bypasses config file)
-    -m, --model <m>     Model name (required if using --baseurl)
+    --base-url <url>    LLM service base URL (bypasses config)
+    -m, --model <m>     Model name (required if using --base-url)
+    --api-key <key>     API key (required if using --base-url)
     -n, --max-steps <n> Max steps per turn
-    -C, --workdir <p>   Working directory for file operations (automatically whitelisted)
-    -P, --allow-path <p> Add path to whitelist (can be used multiple times)
-    --api-key <key>     API key (required if using --baseurl)
+    -C, --workdir <p>   Working directory (automatically whitelisted)
+    -P, --allow-path <p> Add path to whitelist (repeatable)
 
     See 'wolo --help' for PATH PROTECTION details
 
@@ -273,10 +235,13 @@ REPL COMMANDS:
 
 EXAMPLES:
     wolo chat
-    wolo repl -s myproject
+    wolo --repl
+    wolo --repl "let's explore the codebase"
+    wolo chat -s myproject
     wolo chat --agent plan
 
 TO RESUME AN EXISTING SESSION:
+    wolo -r <session_id>
     wolo session resume <session_id>
 """
         print(help_text)
@@ -323,11 +288,12 @@ If stdin has content (pipe), it becomes the first message.
 
 EXAMPLES:
     wolo session resume myproject              # Enter REPL
-    echo "task" | wolo session resume myproject # REPL with initial msg
+    wolo -r myproject                          # Same as above
+    echo "task" | wolo -r myproject            # REPL with initial msg
 
 FOR ONE-SHOT EXECUTION:
-    Use '-r' flag instead:
-    wolo -r myproject "your prompt"
+    Use '-r' with '--solo' flag:
+    wolo -r myproject --solo "your prompt"
 """)
         elif subcommand == "watch":
             print("""wolo session watch <id>
@@ -402,33 +368,5 @@ Show an example configuration file that can be saved to ~/.wolo/config.yaml
 """)
         else:
             show_command_help("config")
-    elif command == "debug":
-        if subcommand == "llm":
-            print("""wolo debug llm <file>
-
-Show usage information for LLM debugging.
-Note: Use 'wolo --debug-llm <file> "your prompt"' instead.
-
-This subcommand is provided for reference only.
-""")
-        elif subcommand == "full":
-            print("""wolo debug full <dir>
-
-Show usage information for full debug mode.
-Note: Use 'wolo --debug-full <dir> "your prompt"' instead.
-
-This subcommand is provided for reference only.
-""")
-        elif subcommand == "benchmark":
-            print("""wolo debug benchmark
-
-Show usage information for benchmark mode.
-Note: Use 'wolo --benchmark "your prompt"' instead.
-Use 'wolo --benchmark --benchmark-output <file> "your prompt"' for custom output file.
-
-This subcommand is provided for reference only.
-""")
-        else:
-            show_command_help("debug")
     else:
         show_main_help()

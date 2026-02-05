@@ -237,7 +237,7 @@ class SummaryCompactionPolicy(CompactionPolicy):
         Returns:
             Generated summary text
         """
-        from wolo.llm import GLMClient
+        from wolo.llm_adapter import WoloLLMClient
         from wolo.session import TextPart, ToolPart
 
         # Build conversation text
@@ -264,7 +264,7 @@ class SummaryCompactionPolicy(CompactionPolicy):
         prompt = template.format(conversation=conversation_text)
 
         # Call LLM
-        client = GLMClient(self._llm_config, None, None)
+        client = WoloLLMClient(self._llm_config, None, None)
 
         try:
             llm_messages = [{"role": "user", "content": prompt}]

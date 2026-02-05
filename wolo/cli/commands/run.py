@@ -40,21 +40,10 @@ class RunCommand(BaseCommand):
         Validate run command arguments.
 
         Rules:
-            1. -r/--resume requires a prompt
+            1. -r/--resume with --solo requires a prompt (one-shot execution)
             2. -w/--watch should be handled by router, not here
             3. Non-REPL execution requires a message
         """
-        # -r requires message
-        if args.session_options.resume_id:
-            message, has_message = get_message_from_sources(args)
-            if not has_message:
-                return (
-                    False,
-                    "Error: -r/--resume requires a prompt.\n"
-                    f"       Use 'wolo session resume {args.session_options.resume_id}' for REPL mode.\n"
-                    f"       Or:  'wolo -r {args.session_options.resume_id} \"your prompt\"' for one-shot execution.",
-                )
-
         # -w should not be here (handled by router)
         if args.session_options.watch_id:
             return (
@@ -62,10 +51,17 @@ class RunCommand(BaseCommand):
                 "Error: -w/--watch is a standalone command. Use 'wolo -w <id>' or 'wolo session watch <id>'",
             )
 
-        # Need message for non-REPL execution
+        # Need message for non-REPL execution (SOLO/COOP modes)
         if args.execution_options.mode != ExecutionMode.REPL:
             message, has_message = get_message_from_sources(args)
             if not has_message:
+                if args.session_options.resume_id:
+                    return (
+                        False,
+                        f"Error: -r/--resume with --solo requires a prompt.\n"
+                        f"       Use 'wolo -r {args.session_options.resume_id}' for REPL mode (no prompt needed).\n"
+                        f"       Or:  'wolo -r {args.session_options.resume_id} --solo \"your prompt\"' for one-shot.",
+                    )
                 return (
                     False,
                     "Error: A prompt is required. Use 'wolo \"your prompt\"' or 'cat file | wolo'",
@@ -208,13 +204,18 @@ class RunCommand(BaseCommand):
             try:
                 os.chdir(workdir_to_use)
             except OSError as e:
-                print(f"Error: Cannot change to working directory '{workdir_to_use}': {e}", file=sys.stderr)
+                print(
+                    f"Error: Cannot change to working directory '{workdir_to_use}': {e}",
+                    file=sys.stderr,
+                )
                 return ExitCode.ERROR
 
         # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
         from wolo.cli.main import _initialize_path_guard
 
-        _initialize_path_guard(config, args.execution_options.allowed_paths, session_id, workdir_to_use)
+        _initialize_path_guard(
+            config, args.execution_options.allowed_paths, session_id, workdir_to_use
+        )
 
         # Setup output configuration first (needed for print_session_info)
         from wolo.cli.output import OutputConfig

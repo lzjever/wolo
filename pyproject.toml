@@ -38,6 +38,7 @@ dependencies = [
     "psutil>=5.9.0",
     "exceptiongroup>=1.0.0; python_version < '3.11'",
     "lexilux>=2.5.0",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
@@ -51,7 +52,6 @@ Issues = "https://github.com/mbos-agent/wolo/issues"
 [tool.setuptools.packages.find]
 exclude = [
     "tests*",
-    "wolo/tests*",
 ]
 
 [tool.setuptools.dynamic]
@@ -82,7 +82,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "wolo/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

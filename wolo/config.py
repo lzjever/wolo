@@ -50,6 +50,9 @@ class MCPConfig:
 class PathSafetyConfig:
     """Configuration for path safety protection.
 
+    This is a compatibility layer that bridges the legacy config format
+    with the new PathGuard modular architecture.
+
     Attributes:
         allowed_write_paths: List of paths where write operations are allowed without confirmation
         max_confirmations_per_session: Maximum number of path confirmations per session
@@ -61,6 +64,24 @@ class PathSafetyConfig:
     max_confirmations_per_session: int = 10
     audit_denied: bool = True
     audit_log_file: Path = field(default_factory=lambda: Path.home() / ".wolo" / "path_audit.log")
+
+    def to_path_guard_config(self, cli_paths: list[Path] | None = None, workdir: Path | None = None) -> "PathGuardConfig":
+        """Convert to PathGuardConfig for use with the new PathGuard architecture.
+
+        Args:
+            cli_paths: Additional paths from CLI arguments (--allow-path/-P)
+            workdir: Working directory from -C/--workdir
+
+        Returns:
+            PathGuardConfig instance for use with PathGuard modules
+        """
+        from wolo.path_guard.config import PathGuardConfig
+
+        return PathGuardConfig(
+            config_paths=self.allowed_write_paths.copy(),
+            cli_paths=cli_paths or [],
+            workdir=workdir,
+        )
 
 
 @dataclass

@@ -129,12 +129,6 @@ class TestShowMainHelp:
         captured = capsys.readouterr()
         assert "SESSION OPTIONS:" in captured.out
 
-    def test_contains_path_protection(self, capsys):
-        """Test main help contains PATH PROTECTION section."""
-        show_main_help()
-        captured = capsys.readouterr()
-        assert "PATH PROTECTION:" in captured.out
-
     def test_contains_examples(self, capsys):
         """Test main help contains EXAMPLES section."""
         show_main_help()

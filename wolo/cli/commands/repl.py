@@ -136,8 +136,7 @@ class ReplCommand(BaseCommand):
             # Create new session
             agent_name = get_random_agent_name()
 
-            # Change to working directory BEFORE initializing PathGuard
-            # This ensures the working directory is the highest priority path
+            # Change to working directory
             workdir_to_use = None
             if workdir:
                 import os
@@ -170,13 +169,6 @@ class ReplCommand(BaseCommand):
                         file=sys.stderr,
                     )
                     return ExitCode.ERROR
-
-        # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
-        from wolo.cli.main import _initialize_path_guard
-
-        _initialize_path_guard(
-            config, args.execution_options.allowed_paths, session_id, workdir_to_use
-        )
 
         # Setup output configuration and event handlers
         from wolo.cli.output import OutputConfig

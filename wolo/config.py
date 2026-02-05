@@ -47,23 +47,6 @@ class MCPConfig:
 
 
 @dataclass
-class PathSafetyConfig:
-    """Configuration for path safety protection.
-
-    Attributes:
-        allowed_write_paths: List of paths where write operations are allowed without confirmation
-        max_confirmations_per_session: Maximum number of path confirmations per session
-        audit_denied: Whether to audit denied operations
-        audit_log_file: Path to audit log file
-    """
-
-    allowed_write_paths: list[Path] = field(default_factory=list)
-    max_confirmations_per_session: int = 10
-    audit_denied: bool = True
-    audit_log_file: Path = field(default_factory=lambda: Path.home() / ".wolo" / "path_audit.log")
-
-
-@dataclass
 class Config:
     api_key: str
     model: str
@@ -82,9 +65,6 @@ class Config:
 
     # MCP configuration
     mcp: MCPConfig = field(default_factory=MCPConfig)
-
-    # Path safety configuration
-    path_safety: PathSafetyConfig = field(default_factory=PathSafetyConfig)
 
     # Compaction configuration (lazy import to avoid circular dependency)
     compaction: Any = None  # Type: CompactionConfig | None
@@ -254,21 +234,6 @@ class Config:
             compaction_data = config_data.get("compaction", {})
             compaction_config = load_compaction_config(compaction_data)
 
-            # Load path safety config
-            path_safety_data = config_data.get("path_safety", {})
-            path_safety_config = PathSafetyConfig(
-                allowed_write_paths=[
-                    Path(p) for p in path_safety_data.get("allowed_write_paths", [])
-                ],
-                max_confirmations_per_session=path_safety_data.get(
-                    "max_confirmations_per_session", 10
-                ),
-                audit_denied=path_safety_data.get("audit_denied", True),
-                audit_log_file=Path(path_safety_data.get("audit_log_file"))
-                if path_safety_data.get("audit_log_file")
-                else Path.home() / ".wolo" / "path_audit.log",
-            )
-
             return cls(
                 api_key=api_key,
                 model=model,
@@ -280,7 +245,6 @@ class Config:
                 claude=claude_config,
                 mcp=mcp_config,
                 compaction=compaction_config,
-                path_safety=path_safety_config,
             )
 
         # Config file mode: use endpoints from config file
@@ -364,17 +328,6 @@ class Config:
         compaction_data = config_data.get("compaction", {})
         compaction_config = load_compaction_config(compaction_data)
 
-        # Load path safety config
-        path_safety_data = config_data.get("path_safety", {})
-        path_safety_config = PathSafetyConfig(
-            allowed_write_paths=[Path(p) for p in path_safety_data.get("allowed_write_paths", [])],
-            max_confirmations_per_session=path_safety_data.get("max_confirmations_per_session", 10),
-            audit_denied=path_safety_data.get("audit_denied", True),
-            audit_log_file=Path(path_safety_data.get("audit_log_file"))
-            if path_safety_data.get("audit_log_file")
-            else Path.home() / ".wolo" / "path_audit.log",
-        )
-
         return cls(
             api_key=key,
             model=model_name,
@@ -386,5 +339,4 @@ class Config:
             claude=claude_config,
             mcp=mcp_config,
             compaction=compaction_config,
-            path_safety=path_safety_config,
         )

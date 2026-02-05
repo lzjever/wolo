@@ -194,7 +194,7 @@ class RunCommand(BaseCommand):
             session_id = create_session(agent_name=agent_name, workdir=workdir)
             check_and_set_session_pid(session_id)
 
-        # Change to working directory BEFORE initializing PathGuard
+        # Change to working directory
         # This ensures the working directory is the highest priority path
         workdir_to_use = None
         if args.execution_options.workdir:
@@ -209,13 +209,6 @@ class RunCommand(BaseCommand):
                     file=sys.stderr,
                 )
                 return ExitCode.ERROR
-
-        # Initialize PathGuard with config, CLI paths, workdir, and session confirmations
-        from wolo.cli.main import _initialize_path_guard
-
-        _initialize_path_guard(
-            config, args.execution_options.allowed_paths, session_id, workdir_to_use
-        )
 
         # Setup output configuration first (needed for print_session_info)
         from wolo.cli.output import OutputConfig

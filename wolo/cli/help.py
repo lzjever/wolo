@@ -87,25 +87,10 @@ OTHER OPTIONS:
     -n, --max-steps <n>     Max steps (default: 100)
     --log-level <lvl>       DEBUG, INFO, WARNING, ERROR
     --save                  Force save session on completion
-    -C, --workdir <path>    Working directory (automatically whitelisted)
-    -P, --allow-path <path> Add path to whitelist (repeatable)
+    -C, --workdir <path>    Working directory
 
     If --base-url is specified, all three (--base-url, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
-
-PATH PROTECTION:
-    Wolo uses whitelist-based path protection for safe file operations.
-    By default, only the working directory (if set via -C) and /tmp are allowed.
-
-    Path Whitelist Priority (highest to lowest):
-        1. Working directory (-C/--workdir) - highest priority
-        2. CLI whitelist paths (-P/--allow-path)
-        3. Config file whitelist (path_safety.allowed_write_paths)
-        4. Default allowed (/tmp)
-
-    Examples:
-        wolo -C /path/to/project "modify files"
-        wolo -C /project -P /home/user/docs "modify files"
 
 OUTPUT OPTIONS:
     --output-style <s>      Output style: minimal, default, verbose
@@ -224,10 +209,7 @@ OPTIONS:
     -m, --model <m>     Model name (required if using --base-url)
     --api-key <key>     API key (required if using --base-url)
     -n, --max-steps <n> Max steps per turn
-    -C, --workdir <p>   Working directory (automatically whitelisted)
-    -P, --allow-path <p> Add path to whitelist (repeatable)
-
-    See 'wolo --help' for PATH PROTECTION details
+    -C, --workdir <p>   Working directory
 
 REPL COMMANDS:
     /exit, /quit        Exit REPL

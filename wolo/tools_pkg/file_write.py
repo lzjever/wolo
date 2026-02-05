@@ -7,24 +7,7 @@ from wolo.smart_replace import smart_replace
 
 
 async def write_execute(file_path: str, content: str) -> dict[str, Any]:
-    """Write content to a file with path safety check."""
-    from wolo.path_guard import Operation, get_path_guard
-    from wolo.path_guard_exceptions import PathConfirmationRequiredError
-
-    # Check path safety
-    guard = get_path_guard()
-    result = guard.check(file_path, Operation.WRITE)
-
-    if result.requires_confirmation:
-        raise PathConfirmationRequiredError(file_path, "write")
-
-    if not result.allowed:
-        return {
-            "title": f"write: {file_path}",
-            "output": f"Permission denied: {result.reason}",
-            "metadata": {"error": "path_not_allowed"},
-        }
-
+    """Write content to a file. Wolo runs in sandbox; no path authorization checks."""
     path = Path(file_path)
 
     try:
@@ -50,23 +33,6 @@ async def write_execute(file_path: str, content: str) -> dict[str, Any]:
 async def edit_execute(file_path: str, old_text: str, new_text: str) -> dict[str, Any]:
     """Edit a file by replacing old_text with new_text using smart matching."""
     import difflib
-
-    from wolo.path_guard import Operation, get_path_guard
-    from wolo.path_guard_exceptions import PathConfirmationRequiredError
-
-    # Check path safety
-    guard = get_path_guard()
-    result = guard.check(file_path, Operation.WRITE)
-
-    if result.requires_confirmation:
-        raise PathConfirmationRequiredError(file_path, "edit")
-
-    if not result.allowed:
-        return {
-            "title": f"edit: {file_path}",
-            "output": f"Permission denied: {result.reason}",
-            "metadata": {"error": "path_not_allowed"},
-        }
 
     path = Path(file_path)
 

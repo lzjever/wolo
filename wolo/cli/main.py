@@ -163,29 +163,23 @@ def _initialize_path_guard(
         session_id: Optional session ID to load confirmed paths from
         workdir: Optional working directory path (automatically allowed if set)
     """
-    from pathlib import Path as PathLib
-
-    from wolo.path_guard import PathGuard, set_path_guard
     from wolo.session import load_path_confirmations
+    from wolo.tools_pkg.path_guard_executor import initialize_path_guard_middleware
 
     config_paths = config.path_safety.allowed_write_paths
-    cli_path_objects = [PathLib(p).resolve() for p in cli_paths]
-
-    # Resolve workdir to absolute path
-    workdir_path = PathLib(workdir).resolve() if workdir else None
 
     # Load session-confirmed paths if resuming a session
     session_confirmed = []
     if session_id:
         session_confirmed = load_path_confirmations(session_id)
 
-    guard = PathGuard(
+    # Initialize the middleware with all path sources
+    initialize_path_guard_middleware(
         config_paths=config_paths,
-        cli_paths=cli_path_objects,
-        session_confirmed=session_confirmed,
-        workdir=workdir_path,
+        cli_paths=cli_paths,
+        workdir=workdir,
+        confirmed_dirs=session_confirmed,
     )
-    set_path_guard(guard)
 
 
 def main() -> int:

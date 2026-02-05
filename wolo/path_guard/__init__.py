@@ -60,6 +60,12 @@ def set_path_guard(checker: PathChecker) -> None:
     _path_checker = checker
 
 
+def reset_path_guard() -> None:
+    """Reset the global PathGuard instance (for testing)."""
+    global _path_checker
+    _path_checker = None
+
+
 # Export public API
 __all__ = [
     # Core
@@ -87,4 +93,5 @@ __all__ = [
     # Temporary globals (will be removed in Task 8)
     "get_path_guard",
     "set_path_guard",
+    "reset_path_guard",
 ]

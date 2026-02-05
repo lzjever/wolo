@@ -105,11 +105,9 @@ async def execute_tool(
                 FileTime.read(session_id, file_path)
 
         elif tool_part.tool == "write":
-            from wolo.cli.path_confirmation import (
-                SessionCancelledError,
-                handle_path_confirmation,
-            )
-            from wolo.path_guard_exceptions import PathConfirmationRequiredError
+            from wolo.path_guard import SessionCancelled
+            from wolo.path_guard.models import Operation
+            from wolo.tools_pkg.path_guard_executor import execute_with_path_guard
 
             file_path = tool_part.input.get("file_path", "")
             content = tool_part.input.get("content", "")
@@ -127,24 +125,18 @@ async def execute_tool(
                     # Skip the write
                     raise
 
-            # Try to write, handle confirmation if needed
+            # Execute with path checking via middleware
             try:
-                result = await write_execute(file_path, content)
-            except PathConfirmationRequiredError as e:
-                # Handle confirmation
-                try:
-                    allowed = await handle_path_confirmation(e.path, e.operation)
-                    if allowed:
-                        # Retry after confirmation
-                        result = await write_execute(file_path, content)
-                    else:
-                        tool_part.status = "error"
-                        tool_part.output = f"Permission denied by user: {e.path}"
-                        return  # Don't continue with normal completion flow
-                except SessionCancelledError:
-                    tool_part.status = "error"
-                    tool_part.output = f"Session cancelled during path confirmation: {e.path}"
-                    return  # Don't continue with normal completion flow
+                result = await execute_with_path_guard(
+                    write_execute,
+                    file_path=file_path,
+                    operation=Operation.WRITE,
+                    content=content,
+                )
+            except SessionCancelled as e:
+                tool_part.status = "error"
+                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                return  # Don't continue with normal completion flow
 
             tool_part.output = result["output"]
             tool_part.status = "completed"
@@ -162,11 +154,9 @@ async def execute_tool(
                 FileTime.update(session_id, file_path)
 
         elif tool_part.tool == "edit":
-            from wolo.cli.path_confirmation import (
-                SessionCancelledError,
-                handle_path_confirmation,
-            )
-            from wolo.path_guard_exceptions import PathConfirmationRequiredError
+            from wolo.path_guard import SessionCancelled
+            from wolo.path_guard.models import Operation
+            from wolo.tools_pkg.path_guard_executor import execute_with_path_guard
 
             file_path = tool_part.input.get("file_path", "")
             old_text = tool_part.input.get("old_text", "")
@@ -185,24 +175,19 @@ async def execute_tool(
                     # Skip the edit
                     raise
 
-            # Try to edit, handle confirmation if needed
+            # Execute with path checking via middleware
             try:
-                result = await edit_execute(file_path, old_text, new_text)
-            except PathConfirmationRequiredError as e:
-                # Handle confirmation
-                try:
-                    allowed = await handle_path_confirmation(e.path, e.operation)
-                    if allowed:
-                        # Retry after confirmation
-                        result = await edit_execute(file_path, old_text, new_text)
-                    else:
-                        tool_part.status = "error"
-                        tool_part.output = f"Permission denied by user: {e.path}"
-                        return  # Don't continue with normal completion flow
-                except SessionCancelledError:
-                    tool_part.status = "error"
-                    tool_part.output = f"Session cancelled during path confirmation: {e.path}"
-                    return  # Don't continue with normal completion flow
+                result = await execute_with_path_guard(
+                    edit_execute,
+                    file_path=file_path,
+                    operation=Operation.WRITE,
+                    old_text=old_text,
+                    new_text=new_text,
+                )
+            except SessionCancelled as e:
+                tool_part.status = "error"
+                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                return  # Don't continue with normal completion flow
 
             tool_part.output = result["output"]
             tool_part.status = "completed"

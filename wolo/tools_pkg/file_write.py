@@ -1,4 +1,8 @@
-"""File writing and editing tools."""
+"""File writing and editing tools.
+
+These are pure tool functions that perform file operations.
+Path checking is handled by the middleware layer (path_guard_executor.py).
+"""
 
 from pathlib import Path
 from typing import Any
@@ -6,25 +10,8 @@ from typing import Any
 from wolo.smart_replace import smart_replace
 
 
-async def write_execute(file_path: str, content: str) -> dict[str, Any]:
-    """Write content to a file with path safety check."""
-    from wolo.path_guard import Operation, get_path_guard
-    from wolo.path_guard_exceptions import PathConfirmationRequiredError
-
-    # Check path safety
-    guard = get_path_guard()
-    result = guard.check(file_path, Operation.WRITE)
-
-    if result.requires_confirmation:
-        raise PathConfirmationRequiredError(file_path, "write")
-
-    if not result.allowed:
-        return {
-            "title": f"write: {file_path}",
-            "output": f"Permission denied: {result.reason}",
-            "metadata": {"error": "path_not_allowed"},
-        }
-
+async def _do_write(file_path: str, content: str) -> dict[str, Any]:
+    """Internal write function - performs actual file write."""
     path = Path(file_path)
 
     try:
@@ -47,26 +34,22 @@ async def write_execute(file_path: str, content: str) -> dict[str, Any]:
         }
 
 
+async def write_execute(file_path: str, content: str) -> dict[str, Any]:
+    """Write content to a file.
+
+    This function is called by the executor which handles path checking
+    via the middleware layer.
+    """
+    return await _do_write(file_path, content)
+
+
 async def edit_execute(file_path: str, old_text: str, new_text: str) -> dict[str, Any]:
-    """Edit a file by replacing old_text with new_text using smart matching."""
+    """Edit a file by replacing old_text with new_text using smart matching.
+
+    This function is called by the executor which handles path checking
+    via the middleware layer.
+    """
     import difflib
-
-    from wolo.path_guard import Operation, get_path_guard
-    from wolo.path_guard_exceptions import PathConfirmationRequiredError
-
-    # Check path safety
-    guard = get_path_guard()
-    result = guard.check(file_path, Operation.WRITE)
-
-    if result.requires_confirmation:
-        raise PathConfirmationRequiredError(file_path, "edit")
-
-    if not result.allowed:
-        return {
-            "title": f"edit: {file_path}",
-            "output": f"Permission denied: {result.reason}",
-            "metadata": {"error": "path_not_allowed"},
-        }
 
     path = Path(file_path)
 

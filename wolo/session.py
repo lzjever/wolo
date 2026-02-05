@@ -1055,9 +1055,9 @@ def save_session(session_id: str, sessions_dir: Path | None = None) -> None:
 
     # Save path confirmations
     try:
-        from wolo.path_guard import get_path_guard
+        from wolo.tools_pkg.path_guard_executor import get_confirmed_dirs
 
-        confirmed = get_path_guard().get_confirmed_dirs()
+        confirmed = get_confirmed_dirs()
         save_path_confirmations(session_id, confirmed)
     except Exception:
         # Don't fail if PathGuard is not initialized or has issues

@@ -65,9 +65,9 @@ class TestPathConfirmationPersistence:
 
 class TestSessionResumeWithConfirmations:
     def test_resume_loads_confirmations_to_pathguard(self, tmp_path, monkeypatch):
-        """Resuming a session should load confirmations into PathGuard"""
+        """Resuming a session should load confirmations into PathChecker"""
         import wolo.session
-        from wolo.path_guard import Operation, PathGuard, reset_path_guard, set_path_guard
+        from wolo.path_guard import Operation, PathGuardConfig, PathChecker, reset_path_guard
 
         # Setup mock session directory
         session_dir = tmp_path / "sessions" / "resume_test"
@@ -81,12 +81,16 @@ class TestSessionResumeWithConfirmations:
         reset_path_guard()
         confirmed = wolo.session.load_path_confirmations("resume_test")
 
-        # Create PathGuard with loaded confirmations
-        guard = PathGuard(session_confirmed=confirmed)
-        set_path_guard(guard)
+        # Create PathChecker with loaded confirmations using PathGuardConfig
+        config = PathGuardConfig(
+            config_paths=[],
+            cli_paths=[],
+        )
+        whitelist = config.create_whitelist(confirmed_dirs=set(confirmed))
+        checker = PathChecker(whitelist)
 
         # Verify paths are allowed
-        result = guard.check("/workspace/file.py", Operation.WRITE)
+        result = checker.check("/workspace/file.py", Operation.WRITE)
 
         assert result.allowed is True
         assert result.requires_confirmation is False
@@ -96,22 +100,27 @@ class TestSaveConfirmationsOnExit:
     def test_saves_on_session_save(self, tmp_path, monkeypatch):
         """Saving session should also save path confirmations"""
         import wolo.session
-        from wolo.path_guard import PathGuard, reset_path_guard, set_path_guard
+        from wolo.path_guard import reset_path_guard
+        from wolo.tools_pkg.path_guard_executor import (
+            initialize_path_guard_middleware,
+            get_confirmed_dirs,
+        )
 
         session_dir = tmp_path / "sessions" / "save_test"
         session_dir.mkdir(parents=True)
         monkeypatch.setattr(wolo.session, "get_session_dir", lambda sid: session_dir)
 
-        # Create PathGuard with confirmed directory
+        # Initialize middleware with a pre-confirmed directory
         reset_path_guard()
-        guard = PathGuard()
-        guard.confirm_directory("/workspace")
-        set_path_guard(guard)
+        initialize_path_guard_middleware(
+            config_paths=[],
+            cli_paths=[],
+            workdir=None,
+            confirmed_dirs=["/workspace"],  # Pre-confirm a directory
+        )
 
-        # Save confirmations
-        from wolo.path_guard import get_path_guard
-
-        confirmed = get_path_guard().get_confirmed_dirs()
+        # Save confirmations using the executor function
+        confirmed = get_confirmed_dirs()
         wolo.session.save_path_confirmations("save_test", confirmed)
 
         # Verify file exists

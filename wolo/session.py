@@ -1012,6 +1012,33 @@ def get_session_dir(session_id: str) -> Path:
     return get_storage().base_dir / session_id
 
 
+def save_path_confirmations(session_id: str, confirmed_dirs: list[Path]) -> None:
+    """Save confirmed paths to session storage."""
+    confirmation_file = get_session_dir(session_id) / "path_confirmations.json"
+
+    data = {
+        "confirmed_dirs": [str(p) for p in confirmed_dirs],
+        "confirmation_count": len(confirmed_dirs),
+        "last_updated": datetime.now().isoformat(),
+    }
+
+    with open(confirmation_file, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_path_confirmations(session_id: str) -> list[Path]:
+    """Load confirmed paths from session storage."""
+    confirmation_file = get_session_dir(session_id) / "path_confirmations.json"
+
+    if not confirmation_file.exists():
+        return []
+
+    with open(confirmation_file) as f:
+        data = json.load(f)
+
+    return [Path(p) for p in data.get("confirmed_dirs", [])]
+
+
 def get_sessions_dir() -> Path:
     """Get the directory where sessions are stored."""
     return get_storage().base_dir
@@ -1025,6 +1052,16 @@ def save_session(session_id: str, sessions_dir: Path | None = None) -> None:
 
     storage = get_storage()
     storage.save_full_session(session)
+
+    # Save path confirmations
+    try:
+        from wolo.tools_pkg.path_guard_executor import get_confirmed_dirs
+
+        confirmed = get_confirmed_dirs()
+        save_path_confirmations(session_id, confirmed)
+    except Exception:
+        # Don't fail if PathGuard is not initialized or has issues
+        pass
 
     logger.info(f"Session saved: {session_id[:8]}...")
 

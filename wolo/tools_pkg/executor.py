@@ -105,6 +105,10 @@ async def execute_tool(
                 FileTime.read(session_id, file_path)
 
         elif tool_part.tool == "write":
+            from wolo.path_guard import SessionCancelled
+            from wolo.path_guard.models import Operation
+            from wolo.tools_pkg.path_guard_executor import execute_with_path_guard
+
             file_path = tool_part.input.get("file_path", "")
             content = tool_part.input.get("content", "")
 
@@ -121,7 +125,19 @@ async def execute_tool(
                     # Skip the write
                     raise
 
-            result = await write_execute(file_path, content)
+            # Execute with path checking via middleware
+            try:
+                result = await execute_with_path_guard(
+                    write_execute,
+                    file_path=file_path,
+                    operation=Operation.WRITE,
+                    content=content,
+                )
+            except SessionCancelled as e:
+                tool_part.status = "error"
+                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                return  # Don't continue with normal completion flow
+
             tool_part.output = result["output"]
             tool_part.status = "completed"
             # Store metadata for verbose display
@@ -138,6 +154,10 @@ async def execute_tool(
                 FileTime.update(session_id, file_path)
 
         elif tool_part.tool == "edit":
+            from wolo.path_guard import SessionCancelled
+            from wolo.path_guard.models import Operation
+            from wolo.tools_pkg.path_guard_executor import execute_with_path_guard
+
             file_path = tool_part.input.get("file_path", "")
             old_text = tool_part.input.get("old_text", "")
             new_text = tool_part.input.get("new_text", "")
@@ -155,7 +175,20 @@ async def execute_tool(
                     # Skip the edit
                     raise
 
-            result = await edit_execute(file_path, old_text, new_text)
+            # Execute with path checking via middleware
+            try:
+                result = await execute_with_path_guard(
+                    edit_execute,
+                    file_path=file_path,
+                    operation=Operation.WRITE,
+                    old_text=old_text,
+                    new_text=new_text,
+                )
+            except SessionCancelled as e:
+                tool_part.status = "error"
+                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
+                return  # Don't continue with normal completion flow
+
             tool_part.output = result["output"]
             tool_part.status = "completed"
             # Store metadata for verbose display (including diff)

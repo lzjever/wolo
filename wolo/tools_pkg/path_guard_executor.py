@@ -15,6 +15,7 @@ from wolo.path_guard import (
     PathGuardMiddleware,
     PathChecker,
     CLIConfirmationStrategy,
+    set_path_guard,
 )
 from wolo.path_guard.models import Operation
 from wolo.path_guard.checker import PathWhitelist
@@ -56,6 +57,9 @@ def initialize_path_guard_middleware(
 
     # Create checker
     _path_checker = PathChecker(whitelist)
+
+    # Set global path guard for CLIConfirmationStrategy to use
+    set_path_guard(_path_checker)
 
     # Create middleware with CLI strategy
     strategy = CLIConfirmationStrategy()

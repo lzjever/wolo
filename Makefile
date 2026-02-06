@@ -1,15 +1,13 @@
-.PHONY: help clean install dev-install test test-cov lint format format-check check build sdist wheel docs html clean-docs run benchmark benchmark-all
+.PHONY: help clean install dev-install sync test test-cov lint format format-check check build sdist wheel docs html clean-docs run benchmark benchmark-all
 
 # Use uv if available, otherwise fall back to pip
 UV := $(shell command -v uv 2>/dev/null)
 ifeq ($(UV),)
 	PIP_CMD = pip
 	PYTHON_CMD = python
-	UV_SYNC = echo "uv not found, skipping sync"
 else
 	PIP_CMD = uv pip
 	PYTHON_CMD = uv run
-	UV_SYNC = uv sync
 endif
 
 help:
@@ -18,6 +16,7 @@ help:
 	@echo "Setup:"
 	@echo "  dev-install   - Install package with development dependencies (recommended)"
 	@echo "  install       - Install the package"
+	@echo "  sync          - Sync lockfile dependencies into .venv"
 	@echo ""
 	@echo "Running:"
 	@echo "  run           - Run wolo with a message (usage: make run MSG='your message')"
@@ -56,12 +55,21 @@ install:
 		$(PIP_CMD) install -e .; \
 	fi
 
+sync:
+	@if [ -n "$(UV)" ]; then \
+		uv sync --group dev --all-extras; \
+	else \
+		$(PIP_CMD) install -e .; \
+		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff build; \
+	fi
+
 dev-install:
 	@echo "Installing package with all development dependencies..."
 	@if [ -n "$(UV)" ]; then \
-		uv sync --all-extras; \
+		uv sync --group dev --all-extras; \
 	else \
-		$(PIP_CMD) install -e ".[dev]"; \
+		$(PIP_CMD) install -e .; \
+		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff build; \
 	fi
 	@echo "✅ Package and dependencies installed! Ready for development."
 
@@ -81,7 +89,7 @@ benchmark:
 	fi
 
 benchmark-all:
-	$(PYTHON_CMD) -m wolo.tests.benchmark
+	$(PYTHON_CMD) tests/unit/benchmark.py
 
 test:
 	$(PYTHON_CMD) -m pytest tests/ -v -n auto
@@ -103,19 +111,25 @@ check: lint format-check test
 
 build: clean
 	@if [ -n "$(UV)" ]; then \
-		uv sync --all-extras; \
+		uv sync --group dev --all-extras; \
+	else \
+		$(PIP_CMD) install build; \
 	fi
 	$(PYTHON_CMD) -m build
 
 sdist: clean
 	@if [ -n "$(UV)" ]; then \
-		uv sync --all-extras; \
+		uv sync --group dev --all-extras; \
+	else \
+		$(PIP_CMD) install build; \
 	fi
 	$(PYTHON_CMD) -m build --sdist
 
 wheel: clean
 	@if [ -n "$(UV)" ]; then \
-		uv sync --all-extras; \
+		uv sync --group dev --all-extras; \
+	else \
+		$(PIP_CMD) install build; \
 	fi
 	$(PYTHON_CMD) -m build --wheel
 
@@ -124,6 +138,9 @@ docs:
 
 html:
 	@echo "Documentation is in README.md"
+
+clean-docs:
+	rm -rf htmlcov/
 
 clean:
 	rm -rf build/

@@ -22,6 +22,7 @@ from wolo.path_guard.models import Operation
 # Global middleware instance (set during initialization)
 _middleware: PathGuardMiddleware | None = None
 _path_checker: PathChecker | None = None
+_wild_mode: bool = False
 
 
 def initialize_path_guard_middleware(
@@ -29,6 +30,10 @@ def initialize_path_guard_middleware(
     cli_paths: list,
     workdir: str | None = None,
     confirmed_dirs: list | None = None,
+    max_confirmations_per_session: int | None = None,
+    audit_denied: bool = True,
+    audit_log_file: str | None = None,
+    wild_mode: bool = False,
 ) -> None:
     """Initialize the global PathGuard middleware and checker.
 
@@ -37,8 +42,13 @@ def initialize_path_guard_middleware(
         cli_paths: Paths from CLI arguments (--allow-path/-P)
         workdir: Working directory from -C/--workdir
         confirmed_dirs: Previously confirmed directories from session resume
+        max_confirmations_per_session: Max number of confirmations allowed per session
+        audit_denied: Whether to write denial audit logs
+        audit_log_file: Audit log file path
     """
     global _middleware, _path_checker
+    global _wild_mode
+    _wild_mode = wild_mode
 
     from pathlib import Path
 
@@ -60,7 +70,11 @@ def initialize_path_guard_middleware(
     set_path_guard(_path_checker)
 
     # Create middleware with CLI strategy
-    strategy = CLIConfirmationStrategy()
+    strategy = CLIConfirmationStrategy(
+        max_confirmations_per_session=max_confirmations_per_session,
+        audit_denied=audit_denied,
+        audit_log_file=Path(audit_log_file) if audit_log_file else None,
+    )
     _middleware = PathGuardMiddleware(_path_checker, strategy)
 
 
@@ -99,6 +113,9 @@ async def execute_with_path_guard(
     Raises:
         SessionCancelled: If user cancels during confirmation
     """
+    if _wild_mode:
+        return await func(file_path=file_path, **kwargs)
+
     middleware = get_path_guard_middleware()
     return await middleware.execute_with_path_check(
         func,

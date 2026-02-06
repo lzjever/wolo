@@ -4,7 +4,7 @@ Wolo is a minimal Python AI agent CLI tool, similar to Claude Code or opencode. 
 
 ## Features
 
-- **Multi-Model Support**: Works with any OpenAI-compatible API (OpenAI, Anthropic, DeepSeek, GLM, etc.)
+- **Multi-Model Support**: Works with any OpenAI-compatible API (OpenAI, Anthropic, DeepSeek, etc.)
 - **Rich Tool System**: Built-in tools for shell commands, file operations, search, and more
 - **Session Management**: Persistent sessions with resume capability
 - **MCP Integration**: Extend capabilities via Model Context Protocol
@@ -35,6 +35,9 @@ wolo chat
 
 # Resume a session
 wolo -r <session-id>
+
+# Wild mode (bypass safety checks/restrictions)
+wolo --wild "run unrestricted task"
 ```
 
 ## Configuration
@@ -46,7 +49,6 @@ Wolo can be configured via environment variables or config file.
 ```bash
 export WOLO_API_KEY="your-api-key-here"
 # or
-export GLM_API_KEY="your-api-key-here"
 ```
 
 **Config File (Development):**
@@ -76,7 +78,7 @@ mcp:
       args: ["-y", "@my/mcp-server"]
 ```
 
-**Priority**: Environment variables take precedence over config file (`WOLO_API_KEY` > `GLM_API_KEY` > config file).
+**Priority**: Environment variables take precedence over config file (`WOLO_API_KEY` > config file).
 
 ## Commands
 
@@ -87,6 +89,7 @@ mcp:
 | `wolo -r <id>` | Resume session |
 | `wolo -l` | List sessions |
 | `wolo -w <id>` | Watch running session |
+| `wolo --wild "prompt"` | Execute in wild mode (no safety checks) |
 | `wolo config show` | Show configuration |
 | `wolo config docs` | Configuration help |
 

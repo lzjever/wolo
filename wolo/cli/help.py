@@ -88,6 +88,8 @@ OTHER OPTIONS:
     --log-level <lvl>       DEBUG, INFO, WARNING, ERROR
     --save                  Force save session on completion
     -C, --workdir <path>    Working directory
+    -P, --allow-path <path> Add allowed write path for this run (repeatable)
+    -W, --wild              Wild mode: bypass safety checks and restrictions
 
     If --base-url is specified, all three (--base-url, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
@@ -210,6 +212,8 @@ OPTIONS:
     --api-key <key>     API key (required if using --base-url)
     -n, --max-steps <n> Max steps per turn
     -C, --workdir <p>   Working directory
+    -P, --allow-path <p> Add allowed write path (repeatable)
+    -W, --wild          Wild mode: bypass safety checks and restrictions
 
 REPL COMMANDS:
     /exit, /quit        Exit REPL

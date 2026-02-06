@@ -3,9 +3,12 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
+
+if TYPE_CHECKING:
+    from wolo.path_guard.config import PathGuardConfig
 
 
 @dataclass
@@ -64,6 +67,7 @@ class PathSafetyConfig:
     max_confirmations_per_session: int = 10
     audit_denied: bool = True
     audit_log_file: Path = field(default_factory=lambda: Path.home() / ".wolo" / "path_audit.log")
+    wild_mode: bool = False
 
     def to_path_guard_config(
         self, cli_paths: list[Path] | None = None, workdir: Path | None = None
@@ -290,7 +294,11 @@ class Config:
                 audit_log_file=Path(path_safety_data.get("audit_log_file"))
                 if path_safety_data.get("audit_log_file")
                 else Path.home() / ".wolo" / "path_audit.log",
+                wild_mode=path_safety_data.get("wild_mode", False),
             )
+
+            if os.getenv("WOLO_WILD_MODE", "").lower() in ("true", "1", "yes"):
+                path_safety_config.wild_mode = True
 
             return cls(
                 api_key=api_key,
@@ -324,8 +332,8 @@ class Config:
                 selected_endpoint = endpoints[0]
 
         # Build config from selected endpoint or fallback to env vars
-        # API key priority: WOLO_API_KEY > GLM_API_KEY > CLI arg > endpoint > error
-        env_key = os.getenv("WOLO_API_KEY") or os.getenv("GLM_API_KEY")
+        # API key priority: WOLO_API_KEY > CLI arg > endpoint > error
+        env_key = os.getenv("WOLO_API_KEY")
 
         if selected_endpoint:
             key = api_key or env_key or selected_endpoint.api_key
@@ -338,13 +346,11 @@ class Config:
             key = api_key or env_key
             if not key:
                 raise ValueError(
-                    "No API key configured. Please set WOLO_API_KEY or GLM_API_KEY environment variable, "
+                    "No API key configured. Please set WOLO_API_KEY environment variable, "
                     "or configure endpoints in ~/.wolo/config.yaml"
                 )
-            model_name = model or os.getenv("WOLO_MODEL", "glm-4")
-            base_url_from_config = os.getenv(
-                "WOLO_API_BASE", "https://open.bigmodel.cn/api/paas/v4"
-            )
+            model_name = model or os.getenv("WOLO_MODEL", "gpt-4o-mini")
+            base_url_from_config = os.getenv("WOLO_API_BASE", "https://api.openai.com/v1")
             temperature = float(os.getenv("WOLO_TEMPERATURE", "0.7"))
             max_tokens = int(os.getenv("WOLO_MAX_TOKENS", "16384"))
 
@@ -355,7 +361,7 @@ class Config:
 
                 logging.getLogger(__name__).warning(
                     "API key read from config file. "
-                    "For better security, use environment variables (WOLO_API_KEY or GLM_API_KEY)."
+                    "For better security, use environment variable WOLO_API_KEY."
                 )
 
         # Load MCP servers from config file or environment variable
@@ -409,7 +415,10 @@ class Config:
             audit_log_file=Path(path_safety_data.get("audit_log_file"))
             if path_safety_data.get("audit_log_file")
             else Path.home() / ".wolo" / "path_audit.log",
+            wild_mode=path_safety_data.get("wild_mode", False),
         )
+        if os.getenv("WOLO_WILD_MODE", "").lower() in ("true", "1", "yes"):
+            path_safety_config.wild_mode = True
 
         return cls(
             api_key=key,

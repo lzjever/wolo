@@ -1,6 +1,5 @@
 """Tests for doom loop detection using context-state."""
 
-
 import pytest
 
 # Check if lexilux is available (required for agent.py imports)
@@ -14,7 +13,7 @@ except ImportError:
 if not LEXILUX_AVAILABLE:
     pytest.skip("lexilux not installed - requires local path dependency", allow_module_level=True)
 
-from wolo.agent import _check_doom_loop, _hash_tool_input
+from wolo.agent import _check_doom_loop
 from wolo.context_state import (
     add_doom_loop_entry,
     clear_doom_loop_history,

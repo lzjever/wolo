@@ -1,9 +1,13 @@
 """Shell execution tools."""
 
 import asyncio
+import re
+import sys
 import time
 import uuid
 from typing import Any
+
+from rich.console import Console
 
 from wolo.tools_pkg.constants import MAX_OUTPUT_LINES, MAX_SHELL_HISTORY
 from wolo.truncate import truncate_output
@@ -13,13 +17,112 @@ from wolo.truncate import truncate_output
 _running_shells: dict[str, dict[str, dict]] = {}
 # Structure: {session_id: [shell_info, ...]}
 _shell_history: dict[str, list[dict]] = {}
+# Structure: {session_id: {risk_pattern_id, ...}}
+_shell_risk_approvals: dict[str, set[str]] = {}
+
+
+SHELL_HIGH_RISK_PATTERNS: list[dict[str, str]] = [
+    {
+        "id": "rm_root_like",
+        "regex": r"\brm\s+-rf?\s+(/(\s|$)|--no-preserve-root\b)",
+        "description": "Destructive recursive delete near root",
+    },
+    {
+        "id": "mkfs_disk",
+        "regex": r"\bmkfs(\.\w+)?\b",
+        "description": "Disk formatting command",
+    },
+    {
+        "id": "dd_to_block_device",
+        "regex": r"\bdd\b[^\\n]*\bof=/dev/",
+        "description": "Raw write to block device",
+    },
+    {
+        "id": "shutdown_or_reboot",
+        "regex": r"\b(shutdown|reboot|halt|poweroff)\b",
+        "description": "System shutdown/reboot command",
+    },
+    {
+        "id": "curl_pipe_shell",
+        "regex": r"\b(curl|wget)\b[^\\n]*\|\s*(sh|bash|zsh)\b",
+        "description": "Remote script piped to shell",
+    },
+    {
+        "id": "git_reset_hard",
+        "regex": r"\bgit\s+reset\s+--hard\b",
+        "description": "Destructive git reset",
+    },
+]
+
+
+def detect_shell_high_risk_patterns(command: str) -> list[dict[str, str]]:
+    """Return matched high-risk command patterns."""
+    matched: list[dict[str, str]] = []
+    for pattern in SHELL_HIGH_RISK_PATTERNS:
+        if re.search(pattern["regex"], command, flags=re.IGNORECASE):
+            matched.append(pattern)
+    return matched
+
+
+def should_allow_shell_command(
+    command: str, session_id: str | None = None
+) -> tuple[bool, str | None]:
+    """Check high-risk shell command and ask for confirmation if needed."""
+    scope_id = session_id or "_global"
+    matched = detect_shell_high_risk_patterns(command)
+    if not matched:
+        return True, None
+
+    approved = _shell_risk_approvals.setdefault(scope_id, set())
+    for pattern in matched:
+        if pattern["id"] in approved:
+            continue
+
+        console = Console()
+        console.print("\n[yellow]High-Risk Shell Command Detected[/yellow]")
+        console.print(f"Pattern: [cyan]{pattern['description']}[/cyan]")
+        console.print(f"Command: [cyan]{command}[/cyan]")
+
+        if not sys.stdin.isatty():
+            return False, (
+                "Denied high-risk shell command in non-interactive mode. "
+                f"Pattern: {pattern['description']}"
+            )
+
+        while True:
+            response = (
+                console.input("\n[yellow]Allow?[/yellow] [y=once / a=session / n=deny] ")
+                .strip()
+                .lower()
+            )
+            if response == "y":
+                break
+            if response == "a":
+                approved.add(pattern["id"])
+                break
+            if response in ("", "n", "no"):
+                return False, f"Denied high-risk shell command: {pattern['description']}"
+
+    return True, None
 
 
 async def shell_execute(
-    command: str, timeout: int = 30000, session_id: str | None = None
+    command: str,
+    timeout: int = 30000,
+    session_id: str | None = None,
+    wild_mode: bool = False,
 ) -> dict[str, Any]:
     """Execute a shell command and return the result."""
     from wolo.subprocess_manager import managed_subprocess
+
+    if not wild_mode:
+        allowed, denial_message = should_allow_shell_command(command, session_id=session_id)
+        if not allowed:
+            return {
+                "title": command,
+                "output": denial_message or "Denied high-risk shell command",
+                "metadata": {"exit_code": -2, "error": "high_risk_shell_denied"},
+            }
 
     shell_id = str(uuid.uuid4())[:8]
     start_time = time.time()
@@ -126,3 +229,5 @@ def clear_shell_state(session_id: str) -> None:
         del _running_shells[session_id]
     if session_id in _shell_history:
         del _shell_history[session_id]
+    if session_id in _shell_risk_approvals:
+        del _shell_risk_approvals[session_id]

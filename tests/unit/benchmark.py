@@ -265,9 +265,9 @@ async def main_benchmark() -> int:
     print()
 
     # Check for API key
-    if not os.getenv("GLM_API_KEY"):
-        print("Error: GLM_API_KEY environment variable is not set.")
-        print("Please set it with: export GLM_API_KEY=your_api_key")
+    if not os.getenv("WOLO_API_KEY"):
+        print("Error: WOLO_API_KEY environment variable is not set.")
+        print("Please set it with: export WOLO_API_KEY=your_api_key")
         return 1
 
     try:

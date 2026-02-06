@@ -41,9 +41,9 @@ PathGuard is organized into modular components with clear separation of concerns
 When checking if a path is allowed, PathGuard checks in this order:
 
 1. **workdir** (highest) - Set via `-C/--workdir`
-2. **cli_paths** - From `--allow-path/-P` CLI arguments
-3. **config_paths** - From `path_safety.allowed_write_paths` in config
-4. **/tmp** (default) - Always allowed
+2. **/tmp** (default) - Always allowed
+3. **cli_paths** - From `--allow-path/-P` CLI arguments
+4. **config_paths** - From `path_safety.allowed_write_paths` in config
 5. **confirmed_dirs** - Directories confirmed during session
 
 ## Default Behavior
@@ -74,6 +74,9 @@ path_safety:
 
   # Audit log file location
   audit_log_file: ~/.wolo/path_audit.log
+
+  # Wild mode: bypass all path safety checks and restrictions
+  wild_mode: false
 ```
 
 ### Command Line
@@ -87,7 +90,32 @@ wolo --allow-path /workspace "create a file"
 
 # Add multiple paths
 wolo -P /workspace -P /var/tmp "run task"
+
+# Wild mode (bypass path checks and safety restrictions)
+wolo --wild "run unrestricted task"
 ```
+
+### Wild Mode
+
+Wild mode is an explicit bypass for safety checks. It is intended for trusted, controlled automation contexts (for example sandbox scripts).
+
+Enable via CLI:
+
+```bash
+wolo --wild "your prompt"
+```
+
+Enable via environment variable:
+
+```bash
+WOLO_WILD_MODE=true wolo "your prompt"
+```
+
+When wild mode is enabled:
+- PathGuard checks/confirmations are bypassed.
+- Shell high-risk pattern prompts are bypassed.
+- Tool permission gate (`deny/ask`) is bypassed.
+- FileTime external-modification checks before write/edit/multiedit are bypassed.
 
 ## User Interaction
 
@@ -103,7 +131,7 @@ Allow this operation? [Y/n/a/q]
 ```
 
 **Options:**
-- `Y` or `y` - Allow this specific operation
+- `Y` or `y` - Allow and confirm the path's containing directory for this session
 - `n` - Deny this operation
 - `a` - Allow entire directory (and subdirectories)
 - `q` - Cancel the entire session
@@ -166,6 +194,12 @@ PathGuard uses a **whitelist-only approach**:
 3. **CLI arguments**: Paths from `--allow-path` / `-P`
 4. **Working directory**: Paths under `-C/--workdir`
 5. **Session confirmations**: Directories confirmed during the session
+
+### Confirmation Limits and Auditing
+
+- `path_safety.max_confirmations_per_session`: Caps how many confirmations are allowed in one session.
+- `path_safety.audit_denied`: When enabled, denied operations are logged.
+- `path_safety.audit_log_file`: Path to the denial audit log file.
 
 All paths are **normalized** (resolving symlinks and relative paths) before checking.
 

@@ -13,7 +13,7 @@ from wolo.tool_registry import get_registry
 # Import tool implementations
 from wolo.tools_pkg.env import get_env_execute
 from wolo.tools_pkg.file_read import read_execute
-from wolo.tools_pkg.file_write import edit_execute, multiedit_execute, write_execute
+from wolo.tools_pkg.file_write import edit_execute, write_execute
 from wolo.tools_pkg.search import file_exists_execute, glob_execute, grep_execute, ls_execute
 from wolo.tools_pkg.shell import shell_execute
 from wolo.tools_pkg.task import task_execute
@@ -36,9 +36,10 @@ async def execute_tool(
         WoloPathSafetyError: If path validation fails
     """
     registry = get_registry()
+    wild_mode = bool(getattr(getattr(config, "path_safety", None), "wild_mode", False))
 
     # Check permissions if agent_config is provided
-    if agent_config:
+    if agent_config and not wild_mode:
         from wolo.agents import check_permission
 
         permission = check_permission(agent_config, tool_part.tool)
@@ -88,9 +89,11 @@ async def execute_tool(
         if tool_part.tool == "shell":
             command = tool_part.input.get("command", "")
             timeout = tool_part.input.get("timeout", 30000)
-            result = await shell_execute(command, timeout, session_id=session_id)
+            result = await shell_execute(
+                command, timeout, session_id=session_id, wild_mode=wild_mode
+            )
             tool_part.output = result["output"]
-            tool_part.status = "completed"
+            tool_part.status = "error" if result.get("metadata", {}).get("error") else "completed"
             # Store metadata for verbose display
             tool_part._metadata = {
                 "command": command,
@@ -103,7 +106,11 @@ async def execute_tool(
             limit = tool_part.input.get("limit", 2000)
             result = await read_execute(file_path, offset, limit)
             tool_part.output = result["output"]
-            tool_part.status = "completed"
+            metadata_error = result.get("metadata", {}).get("error", "")
+            if isinstance(metadata_error, str) and metadata_error.startswith("path_"):
+                tool_part.status = "error"
+            else:
+                tool_part.status = "completed"
             # Store metadata for verbose display
             tool_part._metadata = {
                 "file_path": file_path,
@@ -125,7 +132,7 @@ async def execute_tool(
             content = tool_part.input.get("content", "")
 
             # Check if file was modified externally since last read
-            if session_id:
+            if session_id and not wild_mode:
                 try:
                     FileTime.assert_not_modified(session_id, file_path)
                 except FileModifiedError as e:
@@ -153,7 +160,11 @@ async def execute_tool(
                 ) from e
 
             tool_part.output = result["output"]
-            tool_part.status = "completed"
+            metadata_error = result.get("metadata", {}).get("error", "")
+            if isinstance(metadata_error, str) and metadata_error.startswith("path_"):
+                tool_part.status = "error"
+            else:
+                tool_part.status = "completed"
             # Store metadata for verbose display
             lines = content.count("\n") + 1
             tool_part._metadata = {
@@ -164,7 +175,7 @@ async def execute_tool(
             }
 
             # Update file time after write
-            if session_id:
+            if session_id and tool_part.status == "completed":
                 FileTime.update(session_id, file_path)
 
         elif tool_part.tool == "edit":
@@ -177,7 +188,7 @@ async def execute_tool(
             new_text = tool_part.input.get("new_text", "")
 
             # Check if file was modified externally since last read
-            if session_id:
+            if session_id and not wild_mode:
                 try:
                     FileTime.assert_not_modified(session_id, file_path)
                 except FileModifiedError as e:
@@ -206,7 +217,11 @@ async def execute_tool(
                 ) from e
 
             tool_part.output = result["output"]
-            tool_part.status = "completed"
+            metadata_error = result.get("metadata", {}).get("error", "")
+            if isinstance(metadata_error, str) and metadata_error.startswith("path_"):
+                tool_part.status = "error"
+            else:
+                tool_part.status = "completed"
             # Store metadata for verbose display (including diff)
             tool_part._metadata = {
                 "file_path": file_path,
@@ -221,9 +236,67 @@ async def execute_tool(
 
         elif tool_part.tool == "multiedit":
             edits = tool_part.input.get("edits", [])
-            result = await multiedit_execute(edits)
-            tool_part.output = result["output"]
-            tool_part.status = "completed"
+            from wolo.path_guard import SessionCancelled
+            from wolo.path_guard.models import Operation
+            from wolo.tools_pkg.path_guard_executor import execute_with_path_guard
+
+            results = []
+            success_count = 0
+            has_path_denial = False
+
+            for edit in edits:
+                file_path = edit.get("file_path", "")
+                old_text = edit.get("old_text", "")
+                new_text = edit.get("new_text", "")
+
+                # Check if file was modified externally since last read
+                if session_id and not wild_mode:
+                    try:
+                        FileTime.assert_not_modified(session_id, file_path)
+                    except FileModifiedError as e:
+                        raise WoloToolError(
+                            f"File '{file_path}' has been modified since you last read it. "
+                            f"Please read the file again to see the current contents before editing.",
+                            session_id=session_id,
+                            tool_name="multiedit",
+                            error_type="FileModifiedError",
+                        ) from e
+
+                try:
+                    result = await execute_with_path_guard(
+                        edit_execute,
+                        file_path=file_path,
+                        operation=Operation.WRITE,
+                        old_text=old_text,
+                        new_text=new_text,
+                    )
+                except SessionCancelled as e:
+                    raise WoloPathSafetyError(
+                        f"Session cancelled during path confirmation: {e.path}",
+                        session_id=session_id,
+                        path=e.path,
+                    ) from e
+
+                results.append(result)
+                metadata_error = result.get("metadata", {}).get("error", "")
+                if isinstance(metadata_error, str) and metadata_error.startswith("path_"):
+                    has_path_denial = True
+
+                if "error" not in result.get("metadata", {}):
+                    success_count += 1
+                    if session_id:
+                        FileTime.update(session_id, file_path)
+
+            output_lines = [f"Multi-edit completed: {success_count}/{len(edits)} files edited\n"]
+            for result in results:
+                metadata = result.get("metadata", {})
+                status = "✓" if "error" not in metadata else "✗"
+                title = result.get("title", "unknown")
+                summary = result.get("output", "").split("\n")[0]
+                output_lines.append(f"{status} {title}: {summary}")
+
+            tool_part.output = "\n".join(output_lines)
+            tool_part.status = "error" if has_path_denial else "completed"
 
         elif tool_part.tool == "grep":
             pattern = tool_part.input.get("pattern", "")
@@ -456,8 +529,9 @@ async def execute_tool(
                 tool_part.status = "completed"
 
         else:
+            available_tools = ", ".join(sorted(spec.name for spec in registry.get_all()))
             raise WoloToolError(
-                f"Unknown tool: {tool_part.tool}",
+                f"Unknown tool: {tool_part.tool}. Available tools: {available_tools}",
                 session_id=session_id,
                 tool_name=tool_part.tool,
                 error_type="UnknownToolError",

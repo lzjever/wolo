@@ -57,8 +57,7 @@ class WoloLLMClient:
         # ✅ 配置 ChatParams
         extra_params = None
         if config.enable_think:
-            # ✅ GLM/DeepSeek 推理模式: 需要 thinking 参数
-            # 参考: https://open.bigmodel.cn/dev/api/thinkingmodel/glm-thinking
+            # 推理模式: 部分 OpenAI-compatible providers 需要 thinking 参数
             extra_params = {"thinking": {"type": "enabled"}}
 
         temperature = config.temperature or 1.0

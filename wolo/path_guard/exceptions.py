@@ -20,7 +20,7 @@ class PathCheckError(PathGuardError):
         super().__init__(f"Path check failed for '{path}': {reason}")
 
 
-class PathConfirmationRequired(PathGuardError):
+class PathConfirmationRequired(PathGuardError):  # noqa: N818
     """Raised when a path operation requires user confirmation.
 
     This is a control flow exception, not an error condition.
@@ -38,7 +38,7 @@ class PathConfirmationRequired(PathGuardError):
         super().__init__(f"Path requires confirmation for {operation} on {path}")
 
 
-class SessionCancelled(PathGuardError):
+class SessionCancelled(PathGuardError):  # noqa: N818
     """Raised when user cancels the session during confirmation.
 
     This is a control flow exception for clean session termination.

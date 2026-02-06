@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from wolo.control import ControlManager, ControlState
 from wolo.path_guard.checker import PathChecker, PathWhitelist
 from wolo.path_guard.cli_strategy import CLIConfirmationStrategy
 from wolo.path_guard.exceptions import SessionCancelled
@@ -195,3 +196,35 @@ class TestCLIConfirmationStrategy:
                 elif response.upper() == "Q":
                     with pytest.raises(SessionCancelled):
                         await strategy.confirm("/workspace/file.py", "write")
+
+    async def test_confirm_prefers_ui_prompt_input_when_available(self):
+        """Should use UI prompt_for_input path to avoid raw terminal echo issues."""
+        from wolo.path_guard import set_path_guard
+
+        checker = PathChecker(PathWhitelist())
+        set_path_guard(checker)
+
+        control = ControlManager(state=ControlState.RUNNING)
+
+        class DummyUI:
+            def __init__(self, manager):
+                self.manager = manager
+                self.last_message = ""
+
+            async def prompt_for_input(self, message: str = "") -> str:
+                self.last_message = message
+                return "y"
+
+        ui = DummyUI(control)
+        mock_console = MagicMock()
+
+        with patch("wolo.path_guard.cli_strategy.Console", return_value=mock_console):
+            with patch("wolo.ui.get_current_ui", return_value=ui):
+                with patch("sys.stdin.isatty", return_value=True):
+                    strategy = CLIConfirmationStrategy()
+                    result = await strategy.confirm("/workspace/file.py", "write")
+
+        assert result is True
+        assert control.state == ControlState.RUNNING
+        assert ui.last_message == "Allow this operation? [Y/n/a/q]"
+        mock_console.input.assert_not_called()

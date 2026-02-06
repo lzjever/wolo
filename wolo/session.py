@@ -75,7 +75,7 @@ class Message:
     timestamp: float
     finished: bool = False
     finish_reason: str = ""
-    reasoning_content: str = ""  # GLM thinking mode
+    reasoning_content: str = ""  # Reasoning mode content
     metadata: dict[str, Any] = field(
         default_factory=dict
     )  # Extensible metadata (e.g., compaction info)
@@ -954,7 +954,7 @@ def get_all_tool_calls(message: Message) -> list[ToolPart]:
 
 
 def to_llm_messages(messages: list[Message]) -> list[dict[str, Any]]:
-    """Convert messages to GLM API format."""
+    """Convert messages to OpenAI-compatible API format."""
     result = []
 
     for message in messages:

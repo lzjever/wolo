@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
+from wolo.cli.path_guard import initialize_path_guard_for_session
 
 
 class SessionCommandGroup(BaseCommand):
@@ -331,6 +332,8 @@ class SessionResumeCommand(BaseCommand):
         self, args: ParsedArgs, session_id: str, initial_message: str
     ) -> int:
         """Run REPL mode with an existing session."""
+        import os
+
         from wolo.agents import AGENTS, get_agent
         from wolo.cli.async_utils import safe_async_run
         from wolo.cli.events import setup_event_handlers
@@ -345,6 +348,8 @@ class SessionResumeCommand(BaseCommand):
                 base_url=args.execution_options.base_url,
                 model=args.execution_options.model,
             )
+            if args.execution_options.wild_mode:
+                config.path_safety.wild_mode = True
             config.debug_llm_file = args.execution_options.debug_llm_file
             config.debug_full_dir = args.execution_options.debug_full_dir
         except ValueError as e:
@@ -371,6 +376,14 @@ class SessionResumeCommand(BaseCommand):
             show_reasoning=args.execution_options.show_reasoning,
             json_output=args.execution_options.json_output,
             config_data=Config._load_config_file(),
+        )
+        workdir = args.execution_options.workdir
+        workdir_to_use = os.path.abspath(workdir) if workdir else None
+        initialize_path_guard_for_session(
+            config=config,
+            session_id=session_id,
+            workdir=workdir_to_use,
+            cli_paths=args.execution_options.allow_paths,
         )
         setup_event_handlers(output_config)
 

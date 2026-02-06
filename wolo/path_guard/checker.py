@@ -7,6 +7,10 @@ dependencies. It's testable in isolation and follows single responsibility.
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from wolo.path_guard.models import CheckResult
 
 
 @dataclass(frozen=True)

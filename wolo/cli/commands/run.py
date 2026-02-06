@@ -12,6 +12,7 @@ from wolo.cli.async_utils import safe_async_run
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
+from wolo.cli.path_guard import initialize_path_guard_for_session
 from wolo.cli.utils import get_message_from_sources, handle_keyboard_interrupt
 from wolo.modes import ExecutionMode
 
@@ -113,6 +114,16 @@ class RunCommand(BaseCommand):
                 base_url=args.execution_options.base_url,
                 model=args.execution_options.model,
             )
+            solo_mode = args.execution_options.mode == ExecutionMode.SOLO
+            if solo_mode and not args.execution_options.wild_mode_explicit:
+                config.path_safety.wild_mode = True
+                print(
+                    "[warning] SOLO mode enables --wild automatically. "
+                    "Use --coop/--repl if you need safety guards.",
+                    file=sys.stderr,
+                )
+            elif args.execution_options.wild_mode:
+                config.path_safety.wild_mode = True
             config.debug_llm_file = args.execution_options.debug_llm_file
             config.debug_full_dir = args.execution_options.debug_full_dir
 
@@ -221,8 +232,19 @@ class RunCommand(BaseCommand):
             config_data=Config._load_config_file(),
         )
 
+        # PathGuard must be initialized before any file write/edit tools run.
+        initialize_path_guard_for_session(
+            config=config,
+            session_id=session_id,
+            workdir=workdir_to_use,
+            cli_paths=args.execution_options.allow_paths,
+        )
+
         # Print session info banner (unless --no-banner)
-        if not args.execution_options.no_banner:
+        if (
+            not args.execution_options.no_banner
+            and args.execution_options.mode != ExecutionMode.SOLO
+        ):
             print_session_info(session_id, show_resume_hints=False, output_config=output_config)
 
         # Setup event handlers

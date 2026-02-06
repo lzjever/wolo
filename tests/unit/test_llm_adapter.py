@@ -123,7 +123,7 @@ def test_token_usage_functions():
 
 @pytest.mark.asyncio
 async def test_compatibility_methods(mock_config):
-    """Test compatibility methods with original GLMClient."""
+    """Test compatibility methods with the original client surface."""
     client = WoloLLMClient(config=mock_config)
 
     # Test property access (compatibility with original)

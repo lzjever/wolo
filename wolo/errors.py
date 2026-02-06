@@ -65,7 +65,7 @@ def classify_api_error(
             user_message="Authentication failed. Please check your API key.",
             technical_details=f"HTTP {status_code}: {error_text}",
             suggestions=[
-                "Verify GLM_API_KEY is set correctly",
+                "Verify WOLO_API_KEY is set correctly",
                 "Check if your API key has expired",
                 "Ensure your account has API access enabled",
             ],
@@ -125,7 +125,7 @@ def classify_api_error(
             technical_details=f"HTTP {status_code}: {error_text}",
             suggestions=[
                 "Wait a moment and try again",
-                "Check if the GLM service status page",
+                "Check your model provider status page",
                 "Try again later if the problem persists",
             ],
             status_code=status_code,
@@ -141,7 +141,7 @@ def classify_api_error(
             technical_details=f"{error_type}: {str(exception)}",
             suggestions=[
                 "Check your internet connection",
-                "Verify you can access open.bigmodel.cn",
+                "Verify you can access your configured API endpoint",
                 "Try again in a moment",
             ],
             status_code=None,

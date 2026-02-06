@@ -24,7 +24,7 @@ class TestRunSingleTaskMode:
             patch("wolo.cli.execution.create_ui") as mock_create_ui,
             patch("wolo.cli.execution.add_user_message"),
             # Inline import -> patch at original module
-            patch("wolo.cli.events.show_agent_start"),
+            patch("wolo.cli.events.show_agent_start") as mock_show_agent_start,
             # Inline import -> patch at original module
             patch("wolo.watch_server.start_watch_server", new_callable=AsyncMock) as mock_watch,
             # Module-level import -> patch via wolo.cli.execution
@@ -64,6 +64,7 @@ class TestRunSingleTaskMode:
                 "keyboard": mock_keyboard,
                 "agent_loop": mock_agent_loop,
                 "watch": mock_watch,
+                "show_agent_start": mock_show_agent_start,
             }
 
     @pytest.mark.asyncio
@@ -250,6 +251,37 @@ class TestRunSingleTaskMode:
         assert result == ExitCode.SUCCESS
         # Keyboard should not be started in silent mode
         base_mocks["keyboard"].start.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_solo_mode_hides_shortcuts_and_agent_header(self, base_mocks, capsys):
+        """SOLO mode should suppress shortcuts and agent header output."""
+        from wolo.cli.execution import run_single_task_mode
+        from wolo.config import Config
+        from wolo.modes import ModeConfig, QuotaConfig
+
+        config = MagicMock(spec=Config)
+        agent_config = MagicMock()
+        mode_config = ModeConfig.for_mode(ExecutionMode.SOLO)
+        quota_config = QuotaConfig(max_steps=100)
+
+        result = await run_single_task_mode(
+            config=config,
+            session_id="test-session",
+            agent_config=agent_config,
+            mode_config=mode_config,
+            quota_config=quota_config,
+            message_text="Test message",
+            save_session_flag=False,
+            benchmark_mode=False,
+            benchmark_output="",
+            question_handler=None,
+        )
+
+        assert result == ExitCode.SUCCESS
+        base_mocks["ui"].print_shortcuts.assert_not_called()
+        base_mocks["show_agent_start"].assert_not_called()
+        captured = capsys.readouterr()
+        assert "[test-session]" in captured.out
 
 
 class TestRunReplMode:

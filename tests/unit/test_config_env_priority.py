@@ -10,7 +10,7 @@ import yaml
 from wolo.config import Config
 
 
-@pytest.mark.parametrize("env_var", ["WOLO_API_KEY", "GLM_API_KEY"])
+@pytest.mark.parametrize("env_var", ["WOLO_API_KEY"])
 def test_env_var_takes_precedence_over_config_file(env_var, tmp_path, monkeypatch):
     """Environment variable takes precedence over config file API key."""
     # Mock Path.home() to return tmp_path
@@ -38,31 +38,6 @@ def test_env_var_takes_precedence_over_config_file(env_var, tmp_path, monkeypatc
         assert config.api_key == "env_key_value"
 
 
-def test_wolo_api_key_takes_precedence_over_glm_api_key(tmp_path, monkeypatch):
-    """WOLO_API_KEY takes precedence over GLM_API_KEY."""
-    # Mock Path.home() to return tmp_path
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-    config_dir = tmp_path / ".wolo"
-    config_dir.mkdir()
-    config_file = config_dir / "config.yaml"
-    config_data = {
-        "endpoints": [
-            {
-                "name": "test",
-                "model": "test-model",
-                "api_base": "https://api.test.com",
-                "api_key": "file_key_value",
-            }
-        ]
-    }
-    config_file.write_text(yaml.dump(config_data))
-
-    with patch.dict(os.environ, {"WOLO_API_KEY": "wolo_key", "GLM_API_KEY": "glm_key"}):
-        config = Config.from_env()
-        assert config.api_key == "wolo_key"
-
-
 def test_config_file_api_key_used_when_no_env_var(tmp_path, monkeypatch, caplog):
     """Config file API key is used when no environment variable set."""
     # Mock Path.home() to return tmp_path
@@ -84,9 +59,8 @@ def test_config_file_api_key_used_when_no_env_var(tmp_path, monkeypatch, caplog)
     config_file.write_text(yaml.dump(config_data))
 
     with patch.dict(os.environ, {}, clear=True):
-        # Remove both env vars
+        # Remove env var
         os.environ.pop("WOLO_API_KEY", None)
-        os.environ.pop("GLM_API_KEY", None)
 
         import logging
 
@@ -110,9 +84,8 @@ def test_error_when_no_api_key_configured(tmp_path, monkeypatch):
     config_file.write_text("endpoints: []\n")
 
     with patch.dict(os.environ, {}, clear=True):
-        # Remove both env vars
+        # Remove env var
         os.environ.pop("WOLO_API_KEY", None)
-        os.environ.pop("GLM_API_KEY", None)
 
         with pytest.raises(ValueError) as exc_info:
             Config.from_env()

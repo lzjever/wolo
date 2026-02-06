@@ -27,6 +27,8 @@ SHORT_OPTIONS = {
     "-m": "--model",
     "-n": "--max-steps",
     "-C": "--workdir",
+    "-P": "--allow-path",
+    "-W": "--wild",
 }
 
 # Options that require values
@@ -51,7 +53,9 @@ OPTIONS_NEEDING_VALUE = {
     "--benchmark-output",
     "--output-style",
     "--workdir",
+    "--allow-path",
     "-C",
+    "-P",
 }
 
 # Valid output style choices
@@ -66,7 +70,7 @@ MUTUALLY_EXCLUSIVE_GROUPS = [
 ]
 
 # Options that can be specified multiple times
-MULTI_VALUE_OPTIONS: set[str] = set()
+MULTI_VALUE_OPTIONS: set[str] = {"allow-path", "--allow-path", "-P"}
 
 # Template for combining pipe input with CLI prompt
 DUAL_INPUT_TEMPLATE = """## Context (from stdin)
@@ -105,6 +109,12 @@ class ExecutionOptions:
     json_output: bool = False
     # Working directory
     workdir: str | None = None  # Working directory for the session
+    # Additional allowed paths for PathGuard (repeatable)
+    allow_paths: list[str] = field(default_factory=list)
+    # Wild mode: bypass safety checks and restrictions
+    wild_mode: bool = False
+    # Whether wild mode was explicitly set by CLI flag.
+    wild_mode_explicit: bool = False
 
 
 @dataclass
@@ -290,18 +300,25 @@ class FlexibleArgumentParser:
                 if option_expecting_value:
                     # Check if this is a multi-value option
                     if option_expecting_value in MULTI_VALUE_OPTIONS:
-                        # Store as list, appending to existing values
-                        if option_expecting_value not in options:
-                            options[option_expecting_value] = []
-                        options[option_expecting_value].append(arg)
-                        # Also store with -- prefix for lookup
-                        if not option_expecting_value.startswith("--"):
-                            long_opt = SHORT_OPTIONS.get(
-                                option_expecting_value, f"--{option_expecting_value}"
+                        # Store in canonical key to preserve command-line order.
+                        if option_expecting_value.startswith("--"):
+                            canonical = option_expecting_value
+                        elif option_expecting_value.startswith("-"):
+                            canonical = SHORT_OPTIONS.get(
+                                option_expecting_value, option_expecting_value
                             )
-                            if long_opt not in options:
-                                options[long_opt] = []
-                            options[long_opt].append(arg)
+                        else:
+                            canonical = f"--{option_expecting_value}"
+
+                        if canonical not in options:
+                            options[canonical] = []
+                        options[canonical].append(arg)
+
+                        # Keep legacy key mirror for compatibility with existing lookups.
+                        if option_expecting_value != canonical:
+                            if option_expecting_value not in options:
+                                options[option_expecting_value] = []
+                            options[option_expecting_value].append(arg)
                     else:
                         options[option_expecting_value] = arg
                         # Also store with -- prefix for lookup
@@ -461,3 +478,28 @@ class FlexibleArgumentParser:
             workdir = options.get("--workdir") or options.get("-C")
             if workdir:
                 result.execution_options.workdir = workdir
+
+        # Wild mode
+        if "--wild" in options or "-W" in options or "wild" in options:
+            result.execution_options.wild_mode = True
+            result.execution_options.wild_mode_explicit = True
+
+        # Additional allow paths (-P/--allow-path)
+        allow_paths: list[str] = []
+        canonical_value = options.get("--allow-path")
+        if isinstance(canonical_value, list):
+            allow_paths.extend(canonical_value)
+        elif isinstance(canonical_value, str):
+            allow_paths.append(canonical_value)
+        else:
+            for key in ("-P", "allow-path"):
+                value = options.get(key)
+                if isinstance(value, list):
+                    allow_paths.extend(value)
+                elif isinstance(value, str):
+                    allow_paths.append(value)
+        if allow_paths:
+            # Preserve order while de-duplicating
+            seen: set[str] = set()
+            ordered = [p for p in allow_paths if not (p in seen or seen.add(p))]
+            result.execution_options.allow_paths = ordered

@@ -13,6 +13,7 @@ import sys
 from wolo.cli.commands.base import BaseCommand
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
+from wolo.cli.path_guard import initialize_path_guard_for_session
 from wolo.cli.utils import get_message_from_sources, handle_keyboard_interrupt
 
 
@@ -61,6 +62,8 @@ class ReplCommand(BaseCommand):
                 base_url=args.execution_options.base_url,
                 model=args.execution_options.model,
             )
+            if args.execution_options.wild_mode:
+                config.path_safety.wild_mode = True
             config.debug_llm_file = args.execution_options.debug_llm_file
             config.debug_full_dir = args.execution_options.debug_full_dir
 
@@ -179,6 +182,14 @@ class ReplCommand(BaseCommand):
             show_reasoning=args.execution_options.show_reasoning,
             json_output=args.execution_options.json_output,
             config_data=Config._load_config_file(),
+        )
+
+        # PathGuard must be initialized before any file write/edit tools run.
+        initialize_path_guard_for_session(
+            config=config,
+            session_id=session_id,
+            workdir=workdir_to_use,
+            cli_paths=args.execution_options.allow_paths,
         )
         setup_event_handlers(output_config)
 

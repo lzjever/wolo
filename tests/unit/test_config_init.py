@@ -80,7 +80,7 @@ class TestConfigIsFirstRun:
             "endpoints": [
                 {
                     "name": "default",
-                    "model": "glm-4",
+                    "model": "gpt-4o-mini",
                     "api_base": "https://api.example.com/v1",
                     "api_key": "test-key",
                 }

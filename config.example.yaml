@@ -17,17 +17,17 @@ This is an example configuration file for Wolo. Copy this to `~/.wolo/config.yam
 endpoints:
   # Default endpoint
   - name: default
-    model: glm-4
-    api_base: https://open.bigmodel.cn/api/paas/v4
-    api_key: your-api-key-here  # Or use ${GLM_API_KEY} to read from env
+    model: gpt-4o-mini
+    api_base: https://api.openai.com/v1
+    api_key: your-api-key-here  # Or use ${WOLO_API_KEY} to read from env
     temperature: 0.7
     max_tokens: 16384
   
   # High-capacity endpoint
   - name: plus
-    model: glm-4-plus
-    api_base: https://open.bigmodel.cn/api/paas/v4
-    api_key: ${GLM_API_KEY}  # Environment variable reference
+    model: gpt-4o
+    api_base: https://api.openai.com/v1
+    api_key: ${WOLO_API_KEY}  # Environment variable reference
     temperature: 0.8
     max_tokens: 32768
 
@@ -98,9 +98,9 @@ mcp:
         GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}  # Read from env
 
 # ----------------------------------------------------------------------------
-# GLM Thinking Mode
+# Thinking Mode
 # ----------------------------------------------------------------------------
-# Enable GLM thinking mode for enhanced reasoning capabilities.
+# Enable reasoning mode for enhanced problem-solving capabilities.
 
 enable_think: false  # Set to true to enable thinking mode
 
@@ -171,6 +171,18 @@ compaction:
 # ----------------------------------------------------------------------------
 # Notes
 # ----------------------------------------------------------------------------
+# Path safety (optional)
+# path_safety:
+#   allowed_write_paths:
+#     - /workspace
+#   max_confirmations_per_session: 10
+#   audit_denied: true
+#   audit_log_file: ~/.wolo/path_audit.log
+#   wild_mode: false
+#
+# Wild mode can also be enabled temporarily:
+#   WOLO_WILD_MODE=true wolo "your prompt"
+#
 # - Environment variables can be referenced using ${VAR_NAME} syntax
 # - Comments (lines starting with #) are ignored
 # - All fields are optional - defaults will be used if omitted

@@ -581,7 +581,7 @@ class ToolRegistry:
     def _register_defaults(self):
         """Register all default tools."""
         # Core tools:
-        # - shell (bash): general command execution
+        # - shell: general command execution
         # - read: read file contents
         # - write: write file contents
         # - edit: edit file by replacement

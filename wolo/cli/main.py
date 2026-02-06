@@ -179,43 +179,6 @@ Examples:
     return ExitCode.SUCCESS
 
 
-def _initialize_path_guard(
-    config, cli_paths: list[str], session_id: str | None = None, workdir: str | None = None
-) -> None:
-    """Initialize PathGuard with config, CLI paths, workdir, and session confirmations.
-
-    Priority order for path protection (highest to lowest):
-        1. Working directory (from -C/--workdir) - highest priority
-        2. CLI-provided paths (--allow-path/-P)
-        3. Config file paths (path_safety.allowed_write_paths)
-        4. Default allowed paths (/tmp)
-        5. User-confirmed paths (stored in session)
-
-    Args:
-        config: Configuration object containing path_safety settings
-        cli_paths: List of paths provided via --allow-path CLI argument
-        session_id: Optional session ID to load confirmed paths from
-        workdir: Optional working directory path (automatically allowed if set)
-    """
-    from wolo.session import load_path_confirmations
-    from wolo.tools_pkg.path_guard_executor import initialize_path_guard_middleware
-
-    config_paths = config.path_safety.allowed_write_paths
-
-    # Load session-confirmed paths if resuming a session
-    session_confirmed = []
-    if session_id:
-        session_confirmed = load_path_confirmations(session_id)
-
-    # Initialize the middleware with all path sources
-    initialize_path_guard_middleware(
-        config_paths=config_paths,
-        cli_paths=cli_paths,
-        workdir=workdir,
-        confirmed_dirs=session_confirmed,
-    )
-
-
 def main() -> int:
     """
     Main CLI entry point.

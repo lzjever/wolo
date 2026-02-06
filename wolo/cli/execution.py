@@ -15,7 +15,7 @@ from wolo.config import Config
 from wolo.control import get_manager, remove_manager
 from wolo.llm_adapter import WoloLLMClient
 from wolo.metrics import MetricsCollector, generate_report
-from wolo.modes import ModeConfig, QuotaConfig
+from wolo.modes import ExecutionMode, ModeConfig, QuotaConfig
 from wolo.session import (
     add_user_message,
     save_session,
@@ -39,10 +39,16 @@ async def run_single_task_mode(
     output_config: "OutputConfig | None" = None,
 ) -> int:
     """Run a single task in SOLO or COOP mode."""
+    solo_mode = mode_config.mode == ExecutionMode.SOLO
+
     # Get or create agent display name from session (persists across runs)
     from wolo.session import get_or_create_agent_display_name
 
     agent_display_name = get_or_create_agent_display_name(session_id)
+
+    if solo_mode:
+        print(f"[{session_id}]")
+        print()
 
     # Create control manager and UI based on mode
     control = None
@@ -54,13 +60,13 @@ async def run_single_task_mode(
         ui, keyboard = create_ui(control)
         # Print shortcuts hint immediately when UI is enabled
         # Skip shortcuts in minimal mode (script-friendly)
-        if output_config:
+        if not solo_mode and output_config:
             from wolo.cli.output import OutputStyle
 
             if output_config.style != OutputStyle.MINIMAL:
                 ui.print_shortcuts()
                 print()
-        else:
+        elif not solo_mode:
             ui.print_shortcuts()
             print()
     else:
@@ -73,7 +79,8 @@ async def run_single_task_mode(
     # Use renderer to display agent start (handles minimal mode correctly)
     from wolo.cli.events import show_agent_start
 
-    show_agent_start(agent_display_name)
+    if not solo_mode:
+        show_agent_start(agent_display_name)
 
     # Start control and keyboard listener (if enabled)
     if control:
@@ -173,6 +180,9 @@ async def run_single_task_mode(
 
         return ExitCode.ERROR
     finally:
+        if solo_mode:
+            print(f"\n[{session_id}]")
+
         # Cleanup
         if keyboard:
             keyboard.stop()

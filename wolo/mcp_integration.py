@@ -45,7 +45,7 @@ async def initialize_mcp(config: Config) -> MCPServerManager:
     Returns:
         MCPServerManager instance
     """
-    global _mcp_manager, _claude_skills
+    global _mcp_manager  # _skills is already global (line 29)
 
     # Determine node strategy
     node_strategy = config.mcp.node_strategy

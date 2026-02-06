@@ -13,6 +13,8 @@ if not LEXILUX_AVAILABLE:
 
     pytest.skip("lexilux not installed - requires local path dependency", allow_module_level=True)
 
+from pathlib import Path
+
 import pytest
 
 from wolo.context_state import get_session_todos, set_session_todos
@@ -50,20 +52,25 @@ def test_session_todos_isolated():
         await asyncio.sleep(0.01)
         results.append(get_session_todos())
 
-    asyncio.run(asyncio.gather(session1(), session2()))
+    async def run_both():
+        await asyncio.gather(session1(), session2())
+
+    asyncio.run(run_both())
 
     assert len(results) == 2
-    assert {"content": "task1"} in results
-    assert {"content": "task2"} in results
+    assert [{"content": "task1"}] in results
+    assert [{"content": "task2"}] in results
 
 
-def test_load_session_todos_to_context_state(tmp_path):
+def test_load_session_todos_to_context_state(tmp_path, monkeypatch):
     """load_session_todos_to_context_state loads todos into context-state."""
     from wolo.session import (
         create_session,
         load_session_todos_to_context_state,
         save_session_todos,
     )
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     # Create a test session
     session_id = create_session(agent_name="test_agent")
@@ -80,13 +87,15 @@ def test_load_session_todos_to_context_state(tmp_path):
     assert retrieved == todos
 
 
-def test_save_session_todos_from_context_state(tmp_path):
+def test_save_session_todos_from_context_state(tmp_path, monkeypatch):
     """save_session_todos_from_context_state saves todos from context-state."""
     from wolo.session import (
         create_session,
         load_session_todos,
         save_session_todos_from_context_state,
     )
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     # Create a test session
     session_id = create_session(agent_name="test_agent")

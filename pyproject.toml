@@ -68,6 +68,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "build>=0.10.0",
+    "mypy>=1.11.0",
 ]
 [tool.ruff]
 line-length = 100
@@ -109,4 +110,4 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
-fail_under = 50  # Minimum 50% coverage required
+fail_under = 58  # Incremental gate (current baseline ~59%), raise toward 70 in phases

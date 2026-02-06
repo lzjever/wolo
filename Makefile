@@ -1,4 +1,4 @@
-.PHONY: help clean install dev-install sync test test-cov lint format format-check check build sdist wheel docs html clean-docs run benchmark benchmark-all
+.PHONY: help clean install dev-install sync test test-cov lint mypy format format-check check build sdist wheel docs html clean-docs run benchmark benchmark-all
 
 # Use uv if available, otherwise fall back to pip
 UV := $(shell command -v uv 2>/dev/null)
@@ -29,9 +29,10 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint          - Run linting checks (ruff)"
+	@echo "  mypy          - Run focused type checks"
 	@echo "  format        - Format code with ruff"
 	@echo "  format-check  - Check code formatting"
-	@echo "  check         - Run all checks (lint + format check + tests)"
+	@echo "  check         - Run all checks (lint + mypy + format check + tests)"
 	@echo ""
 	@echo "Building:"
 	@echo "  build         - Build source and wheel distributions"
@@ -60,7 +61,7 @@ sync:
 		uv sync --group dev --all-extras; \
 	else \
 		$(PIP_CMD) install -e .; \
-		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff build; \
+		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff mypy build; \
 	fi
 
 dev-install:
@@ -69,7 +70,7 @@ dev-install:
 		uv sync --group dev --all-extras; \
 	else \
 		$(PIP_CMD) install -e .; \
-		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff build; \
+		$(PIP_CMD) install pytest pytest-asyncio pytest-xdist pytest-cov ruff mypy build; \
 	fi
 	@echo "✅ Package and dependencies installed! Ready for development."
 
@@ -100,13 +101,16 @@ test-cov:
 lint:
 	$(PYTHON_CMD) -m ruff check wolo/ tests/ --output-format=concise --no-fix
 
+mypy:
+	$(PYTHON_CMD) -m mypy --follow-imports=skip wolo/tools_pkg/path_guard_executor.py wolo/cli/path_guard.py
+
 format:
 	$(PYTHON_CMD) -m ruff format wolo/ tests/
 
 format-check:
 	$(PYTHON_CMD) -m ruff format --check wolo/ tests/
 
-check: lint format-check test
+check: lint mypy format-check test
 	@echo "All checks passed!"
 
 build: clean

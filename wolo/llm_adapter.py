@@ -23,12 +23,10 @@ from lexilux.exceptions import TimeoutError as LexiluxTimeoutError
 
 from wolo.agents import AgentConfig
 from wolo.config import Config
+from wolo.context_state.vars import _token_usage_ctx
 from wolo.errors import WoloAPIError
 
 logger = logging.getLogger(__name__)
-
-# Global token usage tracking
-_api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
 class WoloLLMClient:
@@ -125,8 +123,6 @@ class WoloLLMClient:
             - {"type": "tool-call", "tool": "name", "input": {...}, "id": "..."}
             - {"type": "finish", "reason": "stop"}
         """
-        global _api_token_usage
-
         # 1. 产品级调试日志
         self._log_request(messages)
 
@@ -137,7 +133,7 @@ class WoloLLMClient:
         # Reset finish reason, token usage, and tool call tracking
         self._finish_reason = None
         self._emitted_tool_call_starts = set()
-        _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        _token_usage_ctx.set({"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
 
         try:
             # 3. ✅ 调用 lexilux 并启用 reasoning 解析
@@ -152,7 +148,8 @@ class WoloLLMClient:
             async for lexilux_chunk in lexilux_stream:
                 # Update token usage from chunk
                 if lexilux_chunk.usage:
-                    _api_token_usage.update(
+                    # Update context-state with new token counts
+                    _token_usage_ctx.set(
                         {
                             "prompt_tokens": lexilux_chunk.usage.input_tokens or 0,
                             "completion_tokens": lexilux_chunk.usage.output_tokens or 0,
@@ -360,10 +357,9 @@ class WoloLLMClient:
 
 def get_token_usage() -> dict[str, int]:
     """Get token usage from last API call."""
-    return _api_token_usage.copy()
+    return _token_usage_ctx.get().copy()
 
 
 def reset_token_usage() -> None:
     """Reset token usage tracking."""
-    global _api_token_usage
-    _api_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    _token_usage_ctx.set({"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})

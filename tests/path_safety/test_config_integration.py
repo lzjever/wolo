@@ -31,9 +31,7 @@ class TestPathSafetyConfig:
 
     def test_to_path_guard_config_basic(self):
         """Should convert to PathGuardConfig with basic config"""
-        config = PathSafetyConfig(
-            allowed_write_paths=[Path("/workspace"), Path("/tmp")]
-        )
+        config = PathSafetyConfig(allowed_write_paths=[Path("/workspace"), Path("/tmp")])
 
         guard_config = config.to_path_guard_config()
 
@@ -43,9 +41,7 @@ class TestPathSafetyConfig:
 
     def test_to_path_guard_config_with_cli_paths(self):
         """Should include CLI paths in converted config"""
-        config = PathSafetyConfig(
-            allowed_write_paths=[Path("/workspace")]
-        )
+        config = PathSafetyConfig(allowed_write_paths=[Path("/workspace")])
 
         cli_paths = [Path("/var/tmp"), Path("/cache")]
         guard_config = config.to_path_guard_config(cli_paths=cli_paths)
@@ -56,9 +52,7 @@ class TestPathSafetyConfig:
 
     def test_to_path_guard_config_with_workdir(self):
         """Should include workdir in converted config"""
-        config = PathSafetyConfig(
-            allowed_write_paths=[Path("/workspace")]
-        )
+        config = PathSafetyConfig(allowed_write_paths=[Path("/workspace")])
 
         workdir = Path("/home/user/project")
         guard_config = config.to_path_guard_config(workdir=workdir)
@@ -69,16 +63,11 @@ class TestPathSafetyConfig:
 
     def test_to_path_guard_config_full(self):
         """Should convert with all parameters"""
-        config = PathSafetyConfig(
-            allowed_write_paths=[Path("/workspace"), Path("/tmp")]
-        )
+        config = PathSafetyConfig(allowed_write_paths=[Path("/workspace"), Path("/tmp")])
 
         cli_paths = [Path("/var/tmp")]
         workdir = Path("/home/user/project")
-        guard_config = config.to_path_guard_config(
-            cli_paths=cli_paths,
-            workdir=workdir
-        )
+        guard_config = config.to_path_guard_config(cli_paths=cli_paths, workdir=workdir)
 
         assert guard_config.config_paths == [Path("/workspace"), Path("/tmp")]
         assert guard_config.cli_paths == cli_paths
@@ -89,10 +78,7 @@ class TestPathSafetyConfig:
         original_paths = [Path("/workspace")]
         config = PathSafetyConfig(allowed_write_paths=original_paths)
 
-        guard_config = config.to_path_guard_config(
-            cli_paths=[Path("/tmp")],
-            workdir=Path("/work")
-        )
+        config.to_path_guard_config(cli_paths=[Path("/tmp")], workdir=Path("/work"))
 
         # Original should be unchanged
         assert config.allowed_write_paths == original_paths

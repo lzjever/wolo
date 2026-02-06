@@ -1,10 +1,11 @@
 # tests/path_safety/test_persistence.py
 """Tests for PathGuardPersistence module."""
 
-import pytest
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 from wolo.path_guard.persistence import PathGuardPersistence
 

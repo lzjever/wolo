@@ -28,7 +28,9 @@ async def read_execute(file_path: str, offset: int = 0, limit: int = 2000) -> di
         suggestions = _suggest_similar_files(path)
         output = f"File not found: {file_path}"
         if suggestions:
-            output += "\n\nDid you mean one of these?\n" + "\n".join(f"  - {s}" for s in suggestions)
+            output += "\n\nDid you mean one of these?\n" + "\n".join(
+                f"  - {s}" for s in suggestions
+            )
         return {
             "title": file_path,
             "output": output,
@@ -85,7 +87,9 @@ async def read_execute(file_path: str, offset: int = 0, limit: int = 2000) -> di
         footer = "\n</file>"
 
         if truncated:
-            footer = f"\n\n(File has more lines. Use offset={end_line} to continue reading)\n</file>"
+            footer = (
+                f"\n\n(File has more lines. Use offset={end_line} to continue reading)\n</file>"
+            )
         elif offset > 0:
             header = f'<file path="{file_path}" lines="{total_lines}" offset="{offset}">\n'
 

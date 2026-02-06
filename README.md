@@ -39,7 +39,23 @@ wolo -r <session-id>
 
 ## Configuration
 
-Create `~/.wolo/config.yaml`:
+Wolo can be configured via environment variables or config file.
+
+**Environment Variables (Recommended for Production):**
+
+```bash
+export WOLO_API_KEY="your-api-key-here"
+# or
+export GLM_API_KEY="your-api-key-here"
+```
+
+**Config File (Development):**
+
+```bash
+wolo config init
+```
+
+The config file is stored at `~/.wolo/config.yaml`:
 
 ```yaml
 endpoints:
@@ -60,17 +76,7 @@ mcp:
       args: ["-y", "@my/mcp-server"]
 ```
 
-Or use environment variables:
-```bash
-export WOLO_API_BASE="https://api.openai.com/v1"
-export WOLO_MODEL="gpt-4"
-export GLM_API_KEY="your-api-key"
-```
-
-First-time setup wizard:
-```bash
-wolo config init
-```
+**Priority**: Environment variables take precedence over config file (`WOLO_API_KEY` > `GLM_API_KEY` > config file).
 
 ## Commands
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 class Operation(Enum):
     """File operation types."""
+
     READ = "read"
     WRITE = "write"
 

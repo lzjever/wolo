@@ -1,14 +1,15 @@
 # tests/path_safety/test_middleware.py
 """Tests for PathGuardMiddleware module."""
 
-import pytest
 from pathlib import Path
 
-from wolo.path_guard.middleware import PathGuardMiddleware
+import pytest
+
 from wolo.path_guard.checker import PathChecker, PathWhitelist
-from wolo.path_guard.strategy import AutoDenyConfirmationStrategy, AutoAllowConfirmationStrategy
 from wolo.path_guard.exceptions import SessionCancelled
+from wolo.path_guard.middleware import PathGuardMiddleware
 from wolo.path_guard.models import Operation
+from wolo.path_guard.strategy import AutoAllowConfirmationStrategy, AutoDenyConfirmationStrategy
 
 
 class MockToolFunc:
@@ -121,6 +122,7 @@ class TestPathGuardMiddleware:
 
     async def test_session_cancelled_propagates(self):
         """Should propagate SessionCancelled exception."""
+
         class CancelStrategy:
             async def confirm(self, path, operation):
                 raise SessionCancelled()

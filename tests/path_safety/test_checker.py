@@ -1,9 +1,10 @@
 # tests/path_safety/test_checker.py
-import pytest
 from pathlib import Path
 
+import pytest
+
 from wolo.path_guard.checker import PathChecker, PathWhitelist
-from wolo.path_guard.models import CheckResult, Operation
+from wolo.path_guard.models import Operation
 
 
 @pytest.fixture
@@ -161,6 +162,7 @@ class TestPathChecker:
         checker.confirm_directory("/tmp")
         # Create a temp file and confirm it (should confirm parent /tmp)
         import tempfile
+
         with tempfile.NamedTemporaryFile(dir="/tmp", delete=True) as f:
             checker.confirm_directory(f.name)
 

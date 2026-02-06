@@ -7,6 +7,7 @@ All exceptions inherit from PathGuardError for consistent error handling.
 
 class PathGuardError(Exception):
     """Base exception for all PathGuard errors."""
+
     pass
 
 

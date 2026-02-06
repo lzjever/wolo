@@ -11,14 +11,11 @@ The old monolithic PathGuard class has been replaced with:
 
 from pathlib import Path
 
-import pytest
-
 from wolo.path_guard import (
     Operation,
     PathChecker,
-    PathWhitelist,
     PathGuardConfig,
-    reset_path_guard,
+    PathWhitelist,
 )
 
 
@@ -141,8 +138,8 @@ class TestPathGuardExecutor:
     def test_get_confirmed_dirs(self):
         """Test getting confirmed directories"""
         from wolo.tools_pkg.path_guard_executor import (
-            initialize_path_guard_middleware,
             get_confirmed_dirs,
+            initialize_path_guard_middleware,
         )
 
         # Initialize middleware

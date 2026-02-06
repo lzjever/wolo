@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 from wolo.events import bus
+from wolo.exceptions import WoloPathSafetyError, WoloToolError
 from wolo.file_time import FileModifiedError, FileTime
 from wolo.session import ToolPart
 from wolo.tool_registry import get_registry
@@ -22,7 +23,18 @@ from wolo.tools_pkg.todo import todoread_execute, todowrite_execute
 async def execute_tool(
     tool_part: ToolPart, agent_config: Any = None, session_id: str = None, config: Any = None
 ) -> None:
-    """Execute a tool call and update the part with results."""
+    """Execute a tool call and update the part with results.
+
+    Args:
+        tool_part: The tool part to execute
+        agent_config: Optional agent configuration for permission checking
+        session_id: Optional session identifier for error tracking
+        config: Optional configuration object
+
+    Raises:
+        WoloToolError: If tool execution fails
+        WoloPathSafetyError: If path validation fails
+    """
     registry = get_registry()
 
     # Check permissions if agent_config is provided
@@ -116,14 +128,14 @@ async def execute_tool(
             if session_id:
                 try:
                     FileTime.assert_not_modified(session_id, file_path)
-                except FileModifiedError:
-                    tool_part.status = "error"
-                    tool_part.output = (
+                except FileModifiedError as e:
+                    raise WoloToolError(
                         f"File '{file_path}' has been modified since you last read it. "
-                        f"Please read the file again to see the current contents before writing."
-                    )
-                    # Skip the write
-                    raise
+                        f"Please read the file again to see the current contents before writing.",
+                        session_id=session_id,
+                        tool_name="write",
+                        error_type="FileModifiedError",
+                    ) from e
 
             # Execute with path checking via middleware
             try:
@@ -134,9 +146,11 @@ async def execute_tool(
                     content=content,
                 )
             except SessionCancelled as e:
-                tool_part.status = "error"
-                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
-                return  # Don't continue with normal completion flow
+                raise WoloPathSafetyError(
+                    f"Session cancelled during path confirmation: {e.path}",
+                    session_id=session_id,
+                    path=e.path,
+                ) from e
 
             tool_part.output = result["output"]
             tool_part.status = "completed"
@@ -166,14 +180,14 @@ async def execute_tool(
             if session_id:
                 try:
                     FileTime.assert_not_modified(session_id, file_path)
-                except FileModifiedError:
-                    tool_part.status = "error"
-                    tool_part.output = (
+                except FileModifiedError as e:
+                    raise WoloToolError(
                         f"File '{file_path}' has been modified since you last read it. "
-                        f"Please read the file again to see the current contents before editing."
-                    )
-                    # Skip the edit
-                    raise
+                        f"Please read the file again to see the current contents before editing.",
+                        session_id=session_id,
+                        tool_name="edit",
+                        error_type="FileModifiedError",
+                    ) from e
 
             # Execute with path checking via middleware
             try:
@@ -185,9 +199,11 @@ async def execute_tool(
                     new_text=new_text,
                 )
             except SessionCancelled as e:
-                tool_part.status = "error"
-                tool_part.output = f"Session cancelled during path confirmation: {e.path}"
-                return  # Don't continue with normal completion flow
+                raise WoloPathSafetyError(
+                    f"Session cancelled during path confirmation: {e.path}",
+                    session_id=session_id,
+                    path=e.path,
+                ) from e
 
             tool_part.output = result["output"]
             tool_part.status = "completed"
@@ -395,7 +411,13 @@ async def execute_tool(
                             execute_tool(sp, session_id=session_id, config=config)
                             for sp in sub_parts
                         ]
-                        await asyncio.gather(*tasks, return_exceptions=True)
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                        # Check for exceptions
+                        for sp, result in zip(sub_parts, results):
+                            if isinstance(result, Exception):
+                                sp.status = "error"
+                                sp.output = str(result)
 
                         # Collect results
                         output_lines = [f"Batch execution results ({len(sub_parts)} tools):"]
@@ -434,12 +456,46 @@ async def execute_tool(
                 tool_part.status = "completed"
 
         else:
-            tool_part.status = "error"
-            tool_part.output = f"Unknown tool: {tool_part.tool}"
+            raise WoloToolError(
+                f"Unknown tool: {tool_part.tool}",
+                session_id=session_id,
+                tool_name=tool_part.tool,
+                error_type="UnknownToolError",
+            )
 
+    # Handle specific exceptions with proper error types
+    except (WoloToolError, WoloPathSafetyError):
+        # Re-raise our custom exceptions
+        raise
+    except FileNotFoundError as e:
+        raise WoloToolError(
+            f"Tool {tool_part.tool}: File not found - {e}",
+            session_id=session_id,
+            tool_name=tool_part.tool,
+            error_type="FileNotFoundError",
+        ) from e
+    except PermissionError as e:
+        raise WoloToolError(
+            f"Tool {tool_part.tool}: Permission denied - {e}",
+            session_id=session_id,
+            tool_name=tool_part.tool,
+            error_type="PermissionError",
+        ) from e
+    except OSError as e:
+        raise WoloToolError(
+            f"Tool {tool_part.tool}: OS error - {e}",
+            session_id=session_id,
+            tool_name=tool_part.tool,
+            error_type="OSError",
+        ) from e
     except Exception as e:
-        tool_part.status = "error"
-        tool_part.output = f"Error executing {tool_part.tool}: {e}"
+        # Catch-all for truly unexpected errors
+        raise WoloToolError(
+            f"Tool {tool_part.tool}: Unexpected error - {e}",
+            session_id=session_id,
+            tool_name=tool_part.tool,
+            error_type=type(e).__name__,
+        ) from e
 
     # Record end time and duration
     tool_part.end_time = time.time()

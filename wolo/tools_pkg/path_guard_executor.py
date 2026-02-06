@@ -7,19 +7,17 @@ and the PathGuard middleware. It manages the global middleware instance
 and provides convenience functions for path-checked tool execution.
 """
 
-from typing import Any
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from wolo.path_guard import (
+    CLIConfirmationStrategy,
+    PathChecker,
     PathGuardConfig,
     PathGuardMiddleware,
-    PathChecker,
-    CLIConfirmationStrategy,
     set_path_guard,
 )
 from wolo.path_guard.models import Operation
-from wolo.path_guard.checker import PathWhitelist
-
 
 # Global middleware instance (set during initialization)
 _middleware: PathGuardMiddleware | None = None

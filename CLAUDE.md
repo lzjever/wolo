@@ -97,9 +97,33 @@ ruff check --fix .         # Auto-fix lint issues
 ### Configuration (`wolo/config.py`)
 
 - Primary config file: `~/.wolo/config.yaml`
-- Environment variables: `GLM_API_KEY`, `WOLO_MODEL`, `WOLO_API_BASE`
+- Environment variables: `WOLO_API_KEY`, `GLM_API_KEY`, `WOLO_MODEL`, `WOLO_API_BASE`
+- API key priority: `WOLO_API_KEY` > `GLM_API_KEY` > config file (with warning)
 - Direct mode: `--baseurl` + `--api-key` + `--model` bypasses config file
 - Modular configs: `ClaudeCompatConfig`, `MCPConfig`, `CompactionConfig`, `PathSafetyConfig`
+
+### Context-State Subsystem (`wolo/context_state/`)
+
+- **Purpose**: Thread-safe, task-local storage using Python's `contextvars`
+- **Components**:
+  - `vars.py`: ContextVar definitions for token_usage, doom_loop_history, session_todos
+  - `_init.py`: Accessor functions (get_*, reset_*, set_*)
+  - `__init__.py`: Public API exports
+- **Benefits**: Each async task gets isolated state, enabling concurrent sessions
+- **Public API**:
+  - `get_api_token_usage()`, `reset_api_token_usage()`
+  - `get_doom_loop_history()`, `add_doom_loop_entry()`, `clear_doom_loop_history()`
+  - `get_session_todos()`, `set_session_todos()`
+
+### Exception Hierarchy (`wolo/exceptions.py`)
+
+- **WoloError**: Base exception for all Wolo-specific errors
+- **WoloConfigError**: Configuration-related errors (missing API key, invalid config)
+- **WoloToolError**: Tool execution failures (timeout, not found, invalid args)
+- **WoloSessionError**: Session lifecycle errors (not found, load/save failures, PID conflicts)
+- **WoloLLMError**: LLM API errors (auth, rate limiting, network, token limits)
+- **WoloPathSafetyError**: Path validation violations (protected paths, traversal attempts)
+- All exceptions carry `session_id` and structured `context` metadata for debugging
 
 ## Key Patterns and Conventions
 
@@ -109,17 +133,9 @@ async def mytool_execute(param: str) -> dict[str, Any]:
     """Execute tool and return result."""
     try:
         # Do work
-        return {
-            "title": "mytool: ...",
-            "output": "...",
-            "metadata": {...}
-        }
+        return {"title": "mytool: ...", "output": "...", "metadata": {...}}
     except Exception as e:
-        return {
-            "title": "mytool: ...",
-            "output": f"Error: {e}",
-            "metadata": {"error": str(e)}
-        }
+        return {"title": "mytool: ...", "output": f"Error: {e}", "metadata": {"error": str(e)}}
 ```
 
 ### File Operations
@@ -137,6 +153,20 @@ async def mytool_execute(param: str) -> dict[str, Any]:
 - `bus.publish()` for events: `text-delta`, `tool-start`, `tool-complete`, `finish`
 - Used by UI/watch server for real-time updates
 
+### Context-State Usage
+
+- **Always use accessor functions** instead of accessing ContextVars directly
+- **Accessor functions return copies** - prevents accidental mutation
+- **Initialize context-state at session start** - call `load_session_todos_to_context_state()`
+- **Save context-state before session end** - call `save_session_todos_from_context_state()`
+
+### Exception Handling
+
+- **Use specific exception types** from `wolo.exceptions` instead of generic `Exception`
+- **Always include session_id** when raising WoloError subclasses for tracking
+- **CLI formats errors** via `_format_error_message()` for user-friendly display
+- **Tool execution** raises `WoloToolError` or `WoloPathSafetyError` with metadata
+
 ## Important Gotchas
 
 1. **CLI Routing Order**: The routing priority in `wolo/cli/main.py:_route_command()` is strict and must not be modified.
@@ -149,5 +179,8 @@ async def mytool_execute(param: str) -> dict[str, Any]:
 
 5. **Test Directory Structure**: Tests are organized as:
    - `tests/unit/` - Unit tests for individual modules
+   - `tests/integration/` - Integration tests for concurrent sessions
    - `tests/compaction/` - Compaction subsystem tests
    - `tests/path_safety/` - Path safety feature tests
+
+6. **API Key Security**: Always use environment variables (`WOLO_API_KEY` or `GLM_API_KEY`) instead of config file for production deployments. The CLI logs a warning when API key is read from config file.

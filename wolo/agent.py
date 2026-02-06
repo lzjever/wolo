@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 
 # Doom loop detection
 DOOM_LOOP_THRESHOLD = 5
-_doom_loop_history: list[tuple[str, str, str]] = []
 
 
 def _hash_tool_input(tool_input: dict[str, Any]) -> str:
@@ -49,7 +48,24 @@ def _hash_tool_input(tool_input: dict[str, Any]) -> str:
 
 
 def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
-    """Check if this tool call is a doom loop."""
+    """Check if this tool call is a doom loop.
+
+    Uses context-state for history, allowing concurrent sessions
+    to have independent doom loop detection.
+
+    Args:
+        tool_name: Name of the tool being called
+        tool_input: Input parameters for the tool
+
+    Returns:
+        True if doom loop detected, False otherwise
+    """
+    from wolo.context_state import (
+        add_doom_loop_entry,
+        clear_doom_loop_history,
+        get_doom_loop_history,
+    )
+
     read_only_tools = {"read", "glob", "grep", "file_exists", "get_env"}
     if tool_name in read_only_tools:
         return False
@@ -71,12 +87,21 @@ def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
     context_hash = ""
     key = (tool_name, input_hash, context_hash)
 
-    _doom_loop_history.append(key)
-    if len(_doom_loop_history) > DOOM_LOOP_THRESHOLD:
-        _doom_loop_history.pop(0)
+    history = get_doom_loop_history()
+    new_history = history.copy()
+    new_history.append(key)
 
-    if len(_doom_loop_history) >= DOOM_LOOP_THRESHOLD:
-        if len(set(_doom_loop_history)) == 1:
+    # Keep only last DOOM_LOOP_THRESHOLD entries
+    if len(new_history) > DOOM_LOOP_THRESHOLD:
+        new_history.pop(0)
+
+    # Update context-state
+    clear_doom_loop_history()
+    for entry in new_history:
+        add_doom_loop_entry(entry)
+
+    if len(new_history) >= DOOM_LOOP_THRESHOLD:
+        if len(set(new_history)) == 1:
             logger.warning(
                 f"DOOM LOOP DETECTED: {tool_name} called {DOOM_LOOP_THRESHOLD} times with same input"
             )
@@ -369,8 +394,10 @@ async def agent_loop(
 
     client = WoloLLMClient(config, agent_config, session_id, agent_display_name=agent_display_name)
 
-    global _doom_loop_history
-    _doom_loop_history = []
+    # Clear doom loop history for this session
+    from wolo.context_state import clear_doom_loop_history
+
+    clear_doom_loop_history()
 
     collector = MetricsCollector()
     metrics = collector.create_session(session_id, agent_config.name)

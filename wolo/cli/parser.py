@@ -421,7 +421,9 @@ class FlexibleArgumentParser:
             except (ValueError, TypeError):
                 pass
         if "--log-level" in options or "log-level" in options:
-            result.execution_options.log_level = options.get("--log-level") or options.get("log-level")
+            result.execution_options.log_level = options.get("--log-level") or options.get(
+                "log-level"
+            )
         if "--save" in options or "save" in options:
             result.execution_options.save_session = True
         if "--benchmark" in options:

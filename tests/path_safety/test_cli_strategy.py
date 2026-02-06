@@ -1,13 +1,13 @@
 # tests/path_safety/test_cli_strategy.py
 """Tests for CLIConfirmationStrategy module."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from wolo.path_guard.checker import PathChecker, PathWhitelist
 from wolo.path_guard.cli_strategy import CLIConfirmationStrategy
 from wolo.path_guard.exceptions import SessionCancelled
-from wolo.path_guard.checker import PathChecker, PathWhitelist
 
 
 @pytest.mark.asyncio
@@ -19,6 +19,7 @@ class TestCLIConfirmationStrategy:
 
         # Set up the path_guard with a mock checker
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -38,6 +39,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = ""
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -54,6 +56,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = "yes"
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -70,6 +73,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = "n"
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -88,6 +92,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = "no"
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -104,6 +109,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = "a"
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -124,6 +130,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = "q"
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -138,6 +145,7 @@ class TestCLIConfirmationStrategy:
         mock_instance = MagicMock()
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 
@@ -167,6 +175,7 @@ class TestCLIConfirmationStrategy:
         mock_instance.input.return_value = response
 
         from wolo.path_guard import set_path_guard
+
         checker = PathChecker(PathWhitelist())
         set_path_guard(checker)
 

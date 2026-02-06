@@ -16,6 +16,40 @@ from wolo.cli.parser import (
     ParsedArgs,
     validate_option_conflicts,
 )
+from wolo.exceptions import (
+    WoloConfigError,
+    WoloError,
+    WoloLLMError,
+    WoloPathSafetyError,
+    WoloSessionError,
+    WoloToolError,
+)
+
+
+def _format_error_message(error: WoloError) -> str:
+    """Format WoloError for user-friendly display.
+
+    Args:
+        error: The WoloError to format
+
+    Returns:
+        User-friendly error message
+    """
+    if isinstance(error, WoloConfigError):
+        return f"Configuration Error: {error}"
+    if isinstance(error, WoloToolError):
+        tool_name = error.context.get("tool_name", "unknown")
+        return f"Tool Error ({tool_name}): {error}"
+    if isinstance(error, WoloSessionError):
+        session = error.session_id or error.context.get("session_id", "unknown")
+        return f"Session Error ({session}): {error}"
+    if isinstance(error, WoloLLMError):
+        model = error.context.get("model", "unknown")
+        return f"LLM Error ({model}): {error}"
+    if isinstance(error, WoloPathSafetyError):
+        path = error.context.get("path", "unknown")
+        return f"Path Safety Error: {error} (path: {path})"
+    return f"Error: {error}"
 
 
 def _check_stdin() -> bool:
@@ -277,24 +311,42 @@ def main() -> int:
         parsed.message_from_stdin = False
 
     # Execute command
-    if command_type == "execute":
-        from wolo.modes import ExecutionMode
+    try:
+        if command_type == "execute":
+            from wolo.modes import ExecutionMode
 
-        # If mode is REPL (from --resume without --solo), use ReplCommand
-        if parsed.execution_options.mode == ExecutionMode.REPL:
+            # If mode is REPL (from --resume without --solo), use ReplCommand
+            if parsed.execution_options.mode == ExecutionMode.REPL:
+                return ReplCommand().execute(parsed)
+            return RunCommand().execute(parsed)
+        elif command_type == "repl":
+            from wolo.modes import ExecutionMode
+
+            # Set mode to REPL for chat command
+            parsed.execution_options.mode = ExecutionMode.REPL
             return ReplCommand().execute(parsed)
-        return RunCommand().execute(parsed)
-    elif command_type == "repl":
-        from wolo.modes import ExecutionMode
+        elif command_type == "session":
+            return SessionCommandGroup().execute(parsed)
+        elif command_type == "config":
+            return ConfigCommandGroup().execute(parsed)
 
-        # Set mode to REPL for chat command
-        parsed.execution_options.mode = ExecutionMode.REPL
-        return ReplCommand().execute(parsed)
-    elif command_type == "session":
-        return SessionCommandGroup().execute(parsed)
-    elif command_type == "config":
-        return ConfigCommandGroup().execute(parsed)
+        # Unknown command type
+        print(f"Error: Unknown command type: {command_type}", file=sys.stderr)
+        return ExitCode.ERROR
+    except WoloError as e:
+        import logging
 
-    # Unknown command type
-    print(f"Error: Unknown command type: {command_type}", file=sys.stderr)
-    return ExitCode.ERROR
+        logger = logging.getLogger(__name__)
+        logger.error(str(e), extra={"session_id": e.session_id})
+        print(_format_error_message(e), file=sys.stderr)
+        return ExitCode.ERROR
+    except KeyboardInterrupt:
+        print("\nInterrupted by user", file=sys.stderr)
+        return ExitCode.INTERRUPTED
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.exception("Unexpected error")
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return ExitCode.ERROR

@@ -38,7 +38,7 @@ def get_changelog_section(version, changelog_path="CHANGELOG.md"):
     if not os.path.exists(changelog_path):
         return None
 
-    with open(changelog_path, encoding='utf-8') as f:
+    with open(changelog_path, encoding="utf-8") as f:
         lines = f.readlines()
 
     start_pattern = f"## [{version}]"
@@ -56,7 +56,7 @@ def get_changelog_section(version, changelog_path="CHANGELOG.md"):
             extracted_lines.append(line)
 
     if extracted_lines:
-        return ''.join(extracted_lines).strip()
+        return "".join(extracted_lines).strip()
     return None
 
 
@@ -72,9 +72,9 @@ def get_git_commits_since_tag(prev_tag=None):
     """
     try:
         if prev_tag:
-            cmd = ['git', 'log', f'{prev_tag}..HEAD', '--pretty=format:- %s (%h)', '--no-merges']
+            cmd = ["git", "log", f"{prev_tag}..HEAD", "--pretty=format:- %s (%h)", "--no-merges"]
         else:
-            cmd = ['git', 'log', '--pretty=format:- %s (%h)', '--no-merges', '-10']
+            cmd = ["git", "log", "--pretty=format:- %s (%h)", "--no-merges", "-10"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except subprocess.CalledProcessError:
@@ -90,9 +90,7 @@ def get_previous_tag():
     """
     try:
         result = subprocess.run(
-            ['git', 'describe', '--tags', '--abbrev=0', 'HEAD^'],
-            capture_output=True,
-            text=True
+            ["git", "describe", "--tags", "--abbrev=0", "HEAD^"], capture_output=True, text=True
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -129,7 +127,7 @@ def generate_release_notes(version, tag=None):
         else:
             notes_lines.append("Initial release")
 
-        changelog_content = '\n'.join(notes_lines)
+        changelog_content = "\n".join(notes_lines)
 
     # Add installation instructions
     installation = """
@@ -154,7 +152,10 @@ uv pip install mbos-wolo
 def main():
     """Main entry point."""
     if len(sys.argv) < 2:
-        print("Usage: python3 scripts/generate_release_notes.py <version> [output_file]", file=sys.stderr)
+        print(
+            "Usage: python3 scripts/generate_release_notes.py <version> [output_file]",
+            file=sys.stderr,
+        )
         print(__doc__, file=sys.stderr)
         sys.exit(1)
 
@@ -166,12 +167,12 @@ def main():
 
     # Output to file or stdout
     if output_file:
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(notes)
         print(f"Release notes written to: {output_file}", file=sys.stderr)
     else:
         print(notes)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

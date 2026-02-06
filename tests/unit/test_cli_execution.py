@@ -18,9 +18,7 @@ class TestRunSingleTaskMode:
         # Functions imported inline: patch at their original module
         with (
             # Inline import in function body -> patch at original module
-            patch(
-                "wolo.session.get_or_create_agent_display_name", return_value="Claude"
-            ),
+            patch("wolo.session.get_or_create_agent_display_name", return_value="Claude"),
             # Module-level imports -> patch via wolo.cli.execution
             patch("wolo.cli.execution.get_manager") as mock_get_manager,
             patch("wolo.cli.execution.create_ui") as mock_create_ui,
@@ -28,9 +26,7 @@ class TestRunSingleTaskMode:
             # Inline import -> patch at original module
             patch("wolo.cli.events.show_agent_start"),
             # Inline import -> patch at original module
-            patch(
-                "wolo.watch_server.start_watch_server", new_callable=AsyncMock
-            ) as mock_watch,
+            patch("wolo.watch_server.start_watch_server", new_callable=AsyncMock) as mock_watch,
             # Module-level import -> patch via wolo.cli.execution
             patch("wolo.cli.execution.set_watch_server"),
             patch("wolo.cli.execution.agent_loop", new_callable=AsyncMock) as mock_agent_loop,
@@ -40,9 +36,7 @@ class TestRunSingleTaskMode:
             patch("wolo.session.clear_session_pid"),
             # Inline import -> patch at original module
             patch("wolo.watch_server.stop_watch_server", new_callable=AsyncMock),
-            patch(
-                "wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock
-            ),
+            patch("wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock),
             # Inline import -> patch at original module
             patch("wolo.mcp_integration.shutdown_mcp", new_callable=AsyncMock),
         ):
@@ -268,9 +262,7 @@ class TestRunReplMode:
         # Functions imported inline: patch at their original module
         with (
             # Inline import -> patch at original module
-            patch(
-                "wolo.session.get_or_create_agent_display_name", return_value="Claude"
-            ),
+            patch("wolo.session.get_or_create_agent_display_name", return_value="Claude"),
             # Module-level imports -> patch via wolo.cli.execution
             patch("wolo.cli.execution.get_manager") as mock_get_manager,
             patch("wolo.cli.execution.create_ui") as mock_create_ui,
@@ -281,9 +273,7 @@ class TestRunReplMode:
             # Inline import -> patch at original module
             patch("wolo.cli.events.show_agent_start"),
             # Inline import -> patch at original module
-            patch(
-                "wolo.watch_server.start_watch_server", new_callable=AsyncMock
-            ) as mock_watch,
+            patch("wolo.watch_server.start_watch_server", new_callable=AsyncMock) as mock_watch,
             # Module-level import -> patch via wolo.cli.execution
             patch("wolo.cli.execution.set_watch_server"),
             patch("wolo.cli.execution.agent_loop", new_callable=AsyncMock) as mock_agent_loop,
@@ -293,9 +283,7 @@ class TestRunReplMode:
             patch("wolo.session.clear_session_pid"),
             # Inline import -> patch at original module
             patch("wolo.watch_server.stop_watch_server", new_callable=AsyncMock),
-            patch(
-                "wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock
-            ),
+            patch("wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock),
             # Inline import -> patch at original module (note: mcp_integration not mcp)
             patch("wolo.mcp_integration.shutdown_mcp", new_callable=AsyncMock),
         ):
@@ -390,7 +378,6 @@ class TestRunReplMode:
         assert result == ExitCode.SUCCESS
         # Control should be reset after error
         base_mocks["control"].reset.assert_called()
-
 
 
 class TestRunWatchMode:
@@ -489,5 +476,3 @@ class TestRunWatchMode:
             result = await run_watch_mode("test-session")
 
             assert result == ExitCode.SESSION_ERROR
-
-

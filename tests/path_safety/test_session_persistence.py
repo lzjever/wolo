@@ -67,7 +67,7 @@ class TestSessionResumeWithConfirmations:
     def test_resume_loads_confirmations_to_pathguard(self, tmp_path, monkeypatch):
         """Resuming a session should load confirmations into PathChecker"""
         import wolo.session
-        from wolo.path_guard import Operation, PathGuardConfig, PathChecker, reset_path_guard
+        from wolo.path_guard import Operation, PathChecker, PathGuardConfig, reset_path_guard
 
         # Setup mock session directory
         session_dir = tmp_path / "sessions" / "resume_test"
@@ -102,8 +102,8 @@ class TestSaveConfirmationsOnExit:
         import wolo.session
         from wolo.path_guard import reset_path_guard
         from wolo.tools_pkg.path_guard_executor import (
-            initialize_path_guard_middleware,
             get_confirmed_dirs,
+            initialize_path_guard_middleware,
         )
 
         session_dir = tmp_path / "sessions" / "save_test"

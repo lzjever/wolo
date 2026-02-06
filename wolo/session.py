@@ -1233,3 +1233,37 @@ def get_or_create_agent_display_name(session_id: str) -> str:
     """
     storage = get_storage()
     return storage.get_or_create_agent_display_name(session_id)
+
+
+# ==================== Context-State Integration ====================
+
+
+def load_session_todos_to_context_state(session_id: str) -> None:
+    """Load session todos from storage into context-state.
+
+    This function loads todos from disk and populates the context-state
+    for fast runtime access. The context-state provides concurrent-safe
+    isolation between sessions.
+
+    Args:
+        session_id: Session identifier
+    """
+    from wolo.context_state import set_session_todos
+
+    todos = load_session_todos(session_id)
+    set_session_todos(todos)
+
+
+def save_session_todos_from_context_state(session_id: str) -> None:
+    """Save session todos from context-state to storage.
+
+    This function extracts todos from context-state and persists them
+    to disk for durability.
+
+    Args:
+        session_id: Session identifier
+    """
+    from wolo.context_state import get_session_todos
+
+    todos = get_session_todos()
+    save_session_todos(session_id, todos)

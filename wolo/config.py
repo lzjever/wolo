@@ -65,7 +65,9 @@ class PathSafetyConfig:
     audit_denied: bool = True
     audit_log_file: Path = field(default_factory=lambda: Path.home() / ".wolo" / "path_audit.log")
 
-    def to_path_guard_config(self, cli_paths: list[Path] | None = None, workdir: Path | None = None) -> "PathGuardConfig":
+    def to_path_guard_config(
+        self, cli_paths: list[Path] | None = None, workdir: Path | None = None
+    ) -> "PathGuardConfig":
         """Convert to PathGuardConfig for use with the new PathGuard architecture.
 
         Args:
@@ -322,18 +324,21 @@ class Config:
                 selected_endpoint = endpoints[0]
 
         # Build config from selected endpoint or fallback to env vars
+        # API key priority: WOLO_API_KEY > GLM_API_KEY > CLI arg > endpoint > error
+        env_key = os.getenv("WOLO_API_KEY") or os.getenv("GLM_API_KEY")
+
         if selected_endpoint:
-            key = api_key or selected_endpoint.api_key
+            key = api_key or env_key or selected_endpoint.api_key
             model_name = model or selected_endpoint.model
             base_url_from_config = selected_endpoint.api_base
             temperature = selected_endpoint.temperature
             max_tokens = selected_endpoint.max_tokens
         else:
             # No config file - use environment variables only (no defaults)
-            key = api_key or os.getenv("GLM_API_KEY")
+            key = api_key or env_key
             if not key:
                 raise ValueError(
-                    "No API key configured. Please set GLM_API_KEY environment variable "
+                    "No API key configured. Please set WOLO_API_KEY or GLM_API_KEY environment variable, "
                     "or configure endpoints in ~/.wolo/config.yaml"
                 )
             model_name = model or os.getenv("WOLO_MODEL", "glm-4")
@@ -342,6 +347,16 @@ class Config:
             )
             temperature = float(os.getenv("WOLO_TEMPERATURE", "0.7"))
             max_tokens = int(os.getenv("WOLO_MAX_TOKENS", "16384"))
+
+        # Log warning if using config file API key (less secure)
+        if not env_key and not api_key:
+            if selected_endpoint and key == selected_endpoint.api_key:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "API key read from config file. "
+                    "For better security, use environment variables (WOLO_API_KEY or GLM_API_KEY)."
+                )
 
         # Load MCP servers from config file or environment variable
         mcp_servers = config_data.get("mcp_servers", [])

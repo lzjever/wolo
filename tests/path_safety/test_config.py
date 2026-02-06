@@ -1,12 +1,10 @@
 # tests/path_safety/test_config.py
 """Tests for PathGuardConfig module."""
 
-import pytest
 from pathlib import Path
-from pathlib import Path as PathType
 
-from wolo.path_guard.config import PathGuardConfig
 from wolo.path_guard.checker import PathWhitelist
+from wolo.path_guard.config import PathGuardConfig
 
 
 class TestPathGuardConfig:

@@ -25,7 +25,9 @@ def _is_binary_file(path: Path) -> bool:
 
         # Check non-printable character ratio
         non_printable = sum(
-            1 for byte in chunk if byte < 32 and byte not in (9, 10, 13)  # tab, newline, carriage return
+            1
+            for byte in chunk
+            if byte < 32 and byte not in (9, 10, 13)  # tab, newline, carriage return
         )
         ratio = non_printable / len(chunk)
         return ratio > 0.1  # More than 10% non-printable suggests binary

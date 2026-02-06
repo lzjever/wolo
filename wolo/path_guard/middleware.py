@@ -1,13 +1,12 @@
 # wolo/path_guard/middleware.py
 """Middleware for path-checked tool execution."""
 
-from typing import Any, Callable
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from wolo.path_guard.checker import PathChecker
-from wolo.path_guard.strategy import ConfirmationStrategy
-from wolo.path_guard.exceptions import SessionCancelled
 from wolo.path_guard.models import Operation
+from wolo.path_guard.strategy import ConfirmationStrategy
 
 
 class PathGuardMiddleware:

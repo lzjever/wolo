@@ -6,8 +6,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from wolo.path_guard.strategy import ConfirmationStrategy
 from wolo.path_guard.exceptions import SessionCancelled
+from wolo.path_guard.strategy import ConfirmationStrategy
 
 
 class CLIConfirmationStrategy(ConfirmationStrategy):
@@ -55,9 +55,7 @@ class CLIConfirmationStrategy(ConfirmationStrategy):
         # Interactive prompt
         while True:
             response = (
-                self._console.input(
-                    "\n[yellow]Allow this operation?[/yellow] [Y/n/a/q] "
-                )
+                self._console.input("\n[yellow]Allow this operation?[/yellow] [Y/n/a/q] ")
                 .strip()
                 .lower()
             )

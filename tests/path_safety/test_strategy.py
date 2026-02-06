@@ -4,9 +4,9 @@
 import pytest
 
 from wolo.path_guard.strategy import (
-    ConfirmationStrategy,
-    AutoDenyConfirmationStrategy,
     AutoAllowConfirmationStrategy,
+    AutoDenyConfirmationStrategy,
+    ConfirmationStrategy,
 )
 
 

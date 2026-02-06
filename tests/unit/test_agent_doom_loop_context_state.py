@@ -25,14 +25,15 @@ def test_check_doom_loop_uses_context_state():
     """Doom loop detection uses context-state for history."""
     clear_doom_loop_history()
 
-    # Same call 5 times should trigger doom loop
+    # Same call DOOM_LOOP_THRESHOLD (5) times triggers doom loop
     tool_input = {"path": "/tmp/test.txt"}
 
-    for _ in range(5):
+    # First 4 calls should not trigger doom loop
+    for _ in range(4):
         result = _check_doom_loop("write", tool_input)
         assert result is False
 
-    # 6th call should detect doom loop
+    # 5th call should detect doom loop
     result = _check_doom_loop("write", tool_input)
     assert result is True
 
@@ -89,7 +90,7 @@ def test_doom_loop_threshold():
 
     tool_input = {"path": "/tmp/test.txt"}
 
-    # Call DOOM_LOOP_THRESHOLD - 1 times (should not trigger)
+    # First 4 calls should not trigger doom loop
     for _ in range(4):
         result = _check_doom_loop("write", tool_input)
         assert result is False

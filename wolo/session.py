@@ -239,6 +239,10 @@ class SessionStorage:
                 finally:
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
+            # Ensure parent directory exists before rename
+            # (may be deleted by another process in parallel scenarios)
+            path.parent.mkdir(parents=True, exist_ok=True)
+
             # Atomic rename
             temp_path.rename(path)
         except Exception as e:

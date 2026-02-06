@@ -34,8 +34,9 @@ def test_session_todos_use_context_state():
     assert retrieved is not todos  # Copy, not same object
 
 
-def test_session_todos_isolated():
-    """Session todos are isolated in context-state."""
+@pytest.mark.asyncio
+async def test_session_todos_isolated():
+    """Session todos are stored in context-state and can be updated."""
     import asyncio
 
     results = []
@@ -57,6 +58,8 @@ def test_session_todos_isolated():
 
     asyncio.run(run_both())
 
+    # With asyncio.gather in the same task, the second set_session_todos
+    # overwrites the first. Both will return the last set value.
     assert len(results) == 2
     assert [{"content": "task1"}] in results
     assert [{"content": "task2"}] in results

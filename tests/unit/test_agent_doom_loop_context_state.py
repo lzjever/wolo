@@ -89,7 +89,7 @@ def test_doom_loop_threshold():
 
     tool_input = {"path": "/tmp/test.txt"}
 
-    # Call DOOM_LOOP_THRESHOLD - 1 times (should not trigger)
+    # First 4 calls should not trigger doom loop
     for _ in range(4):
         result = _check_doom_loop("write", tool_input)
         assert result is False

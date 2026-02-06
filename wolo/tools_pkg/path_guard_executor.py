@@ -8,8 +8,10 @@ and provides convenience functions for path-checked tool execution.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
+from wolo.exceptions import WoloPathSafetyError
 from wolo.path_guard import (
     CLIConfirmationStrategy,
     PathChecker,
@@ -81,14 +83,23 @@ def initialize_path_guard_middleware(
 def get_path_guard_middleware() -> PathGuardMiddleware:
     """Get the global PathGuard middleware."""
     if _middleware is None:
-        raise RuntimeError("PathGuard middleware not initialized")
+        raise WoloPathSafetyError(
+            "PathGuard middleware is not initialized. "
+            "Initialize it via wolo.cli.path_guard.initialize_path_guard_for_session(...) "
+            "before executing write/edit tools.",
+            error_type="PathGuardNotInitialized",
+        )
     return _middleware
 
 
 def get_path_checker() -> PathChecker:
     """Get the global PathChecker instance."""
     if _path_checker is None:
-        raise RuntimeError("PathChecker not initialized")
+        raise WoloPathSafetyError(
+            "PathChecker is not initialized. "
+            "Initialize PathGuard middleware before requesting confirmed directories.",
+            error_type="PathCheckerNotInitialized",
+        )
     return _path_checker
 
 
@@ -117,19 +128,20 @@ async def execute_with_path_guard(
         return await func(file_path=file_path, **kwargs)
 
     middleware = get_path_guard_middleware()
-    return await middleware.execute_with_path_check(
+    result = await middleware.execute_with_path_check(
         func,
         file_path=file_path,
         operation=operation,
         **kwargs,
     )
+    return cast(dict[str, Any], result)
 
 
-def get_confirmed_dirs() -> list:
+def get_confirmed_dirs() -> list[Path]:
     """Get list of confirmed directories for session persistence.
 
     Returns:
         List of confirmed directory paths
     """
     checker = get_path_checker()
-    return checker.get_confirmed_dirs()
+    return cast(list[Path], checker.get_confirmed_dirs())

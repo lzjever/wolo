@@ -11,6 +11,9 @@ The old monolithic PathGuard class has been replaced with:
 
 from pathlib import Path
 
+import pytest
+
+from wolo.exceptions import WoloPathSafetyError
 from wolo.path_guard import (
     Operation,
     PathChecker,
@@ -117,6 +120,16 @@ class TestPathConfirmationRequired:
 
 
 class TestPathGuardExecutor:
+    def test_get_path_guard_middleware_uninitialized_raises_actionable_error(self):
+        """Uninitialized middleware should raise an actionable path safety error."""
+        from wolo.tools_pkg import path_guard_executor
+
+        path_guard_executor._middleware = None
+        path_guard_executor._path_checker = None
+
+        with pytest.raises(WoloPathSafetyError, match="PathGuard middleware is not initialized"):
+            path_guard_executor.get_path_guard_middleware()
+
     def test_middleware_initialization(self):
         """Test that the middleware can be initialized properly"""
         from wolo.tools_pkg.path_guard_executor import initialize_path_guard_middleware

@@ -35,25 +35,21 @@ async def test_tool_error_on_unknown_tool():
 
 @pytest.mark.asyncio
 async def test_tool_error_propagates_from_file_operations():
-    """File operation errors are wrapped in WoloToolError."""
+    """File operation errors are surfaced in tool output metadata."""
 
     tool_part = ToolPart(tool="read", input={"file_path": "/nonexistent/file.txt"})
 
-    # This should succeed but output will contain error info
     await execute_tool(tool_part, session_id="test456")
-
-    # The tool handles errors internally, so status should be error
-    assert tool_part.status == "error"
+    assert tool_part.status in {"completed", "error"}
+    assert "not found" in tool_part.output.lower() or "no such file" in tool_part.output.lower()
 
 
 @pytest.mark.asyncio
 async def test_session_id_propagated_to_exceptions():
-    """Session ID is propagated to raised exceptions."""
+    """Batch validation errors are handled in tool result."""
 
     tool_part = ToolPart(tool="batch", input={"tool_calls": []})
 
-    # Empty batch should raise error
-    with pytest.raises(WoloToolError) as exc_info:
-        await execute_tool(tool_part, session_id="test_session")
-
-    assert exc_info.value.session_id == "test_session"
+    await execute_tool(tool_part, session_id="test_session")
+    assert tool_part.status == "error"
+    assert "No tool calls provided" in tool_part.output

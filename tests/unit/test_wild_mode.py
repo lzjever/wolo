@@ -54,9 +54,19 @@ async def test_execute_tool_wild_mode_bypasses_agent_permission_gate():
 
 
 @pytest.mark.asyncio
-async def test_execute_tool_bash_is_unknown_tool():
+async def test_execute_tool_bash_alias_maps_to_shell():
     config = SimpleNamespace(path_safety=SimpleNamespace(wild_mode=False))
     tool_part = ToolPart(tool="bash", input={"command": "echo alias-ok"})
-    with pytest.raises(WoloToolError, match=r"Unknown tool: bash\.") as exc_info:
+    await execute_tool(tool_part, config=config, session_id="alias")
+    assert tool_part.tool == "shell"
+    assert tool_part.status == "completed"
+    assert "alias-ok" in tool_part.output
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_unknown_tool_still_fails():
+    config = SimpleNamespace(path_safety=SimpleNamespace(wild_mode=False))
+    tool_part = ToolPart(tool="foobar_tool", input={"command": "echo alias-ok"})
+    with pytest.raises(WoloToolError, match=r"Unknown tool: foobar_tool\.") as exc_info:
         await execute_tool(tool_part, config=config, session_id="alias")
     assert exc_info.value.context.get("error_type") == "UnknownToolError"

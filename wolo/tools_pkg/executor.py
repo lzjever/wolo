@@ -1,6 +1,7 @@
 """Tool execution dispatcher."""
 
 import asyncio
+import logging
 import time
 from typing import Any
 
@@ -18,6 +19,18 @@ from wolo.tools_pkg.search import file_exists_execute, glob_execute, grep_execut
 from wolo.tools_pkg.shell import shell_execute
 from wolo.tools_pkg.task import task_execute
 from wolo.tools_pkg.todo import todoread_execute, todowrite_execute
+
+logger = logging.getLogger(__name__)
+
+# Canonical tool aliases accepted from model output.
+TOOL_ALIASES = {
+    "bash": "shell",
+}
+
+
+def _canonicalize_tool_name(tool_name: str) -> str:
+    """Normalize tool aliases to registered tool names."""
+    return TOOL_ALIASES.get(tool_name, tool_name)
 
 
 async def execute_tool(
@@ -37,6 +50,15 @@ async def execute_tool(
     """
     registry = get_registry()
     wild_mode = bool(getattr(getattr(config, "path_safety", None), "wild_mode", False))
+    original_tool_name = tool_part.tool
+    canonical_tool_name = _canonicalize_tool_name(original_tool_name)
+    if canonical_tool_name != original_tool_name:
+        logger.warning(
+            "Canonicalized tool alias '%s' to '%s'",
+            original_tool_name,
+            canonical_tool_name,
+        )
+        tool_part.tool = canonical_tool_name
 
     # Check permissions if agent_config is provided
     if agent_config and not wild_mode:

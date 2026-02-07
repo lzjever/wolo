@@ -168,7 +168,7 @@ def _register_mcp_tools() -> None:
 
     # Register tools from MCP servers
     for server_name, tool in _mcp_manager.get_all_tools():
-        tool_name = f"mcp_{server_name}_{tool.name}"
+        tool_name = f"mcp_{server_name}__{tool.name}"
 
         # Skip if already registered
         if tool_name in _registered_mcp_tools:
@@ -194,7 +194,7 @@ async def call_mcp_tool(tool_name: str, arguments: dict) -> dict:
     Call an MCP tool.
 
     Args:
-        tool_name: Tool name (prefixed with mcp_<server>_)
+        tool_name: Tool name (prefixed with mcp_<server>__)
         arguments: Tool arguments
 
     Returns:

@@ -10,6 +10,7 @@ from wolo.agents import AgentConfig
 from wolo.compaction import CompactionManager, CompactionStatus
 from wolo.config import Config
 from wolo.events import bus
+from wolo.exceptions import WoloPathSafetyError
 
 # Token tracking functions - use new adapter module
 from wolo.llm_adapter import get_token_usage, reset_token_usage
@@ -154,10 +155,10 @@ async def _handle_pending_tools(
     step: int,
     agent_display_name: str,
     saver: Optional["SessionSaver"] = None,
-) -> tuple[bool, str | None, int]:
-    """Handle pending tool calls. Returns (should_continue, user_input, new_step)."""
+) -> tuple[bool, str | None, int, float]:
+    """Handle pending tool calls. Returns (should_continue, user_input, new_step, tool_duration_ms)."""
     if not has_pending_tool_calls(last_assistant):
-        return True, None, step
+        return True, None, step, 0.0
 
     pending = get_pending_tool_calls(last_assistant)
     logger.info(f"Executing {len(pending)} pending tool calls")
@@ -175,7 +176,17 @@ async def _handle_pending_tools(
                 break
             await control.wait_if_paused()
 
-        await execute_tool(tool_call, agent_config, session_id, config)
+        try:
+            await execute_tool(tool_call, agent_config, session_id, config)
+        except WoloPathSafetyError:
+            # User cancelled path confirmation — propagate to stop the loop
+            raise
+        except Exception as e:
+            # Tool errors should not crash the agent loop
+            logger.error("Tool %s failed: %s", tool_call.tool, e)
+            if tool_call.status != "error":
+                tool_call.status = "error"
+                tool_call.output = tool_call.output or str(e)
         await bus.publish(
             "tool-result",
             {"tool": tool_call.tool, "output": tool_call.output, "status": tool_call.status},
@@ -186,7 +197,7 @@ async def _handle_pending_tools(
         if saver:
             saver.save()
 
-    (time.time() - tool_start_time) * 1000
+    tool_duration_ms = (time.time() - tool_start_time) * 1000
 
     # Check for interrupt after tool execution
     if control and control.should_interrupt():
@@ -200,11 +211,11 @@ async def _handle_pending_tools(
         if user_input:
             add_user_message(session_id, user_input)
             print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
-            return True, user_input, step
+            return True, user_input, step, tool_duration_ms
         else:
-            return False, None, step
+            return False, None, step, tool_duration_ms
 
-    return True, None, step + 1
+    return True, None, step, tool_duration_ms
 
 
 def _should_exit_loop(
@@ -354,7 +365,7 @@ async def _call_llm(
                 tool_calls_this_step.append(
                     {"tool": event.get("tool"), "input": event.get("input")}
                 )
-            await process_event(event, assistant_msg, current_text_part)
+            current_text_part = await process_event(event, assistant_msg, current_text_part)
     except Exception as e:
         logger.error(f"Error during LLM call: {e}")
         assistant_msg.finished = True
@@ -451,8 +462,14 @@ async def agent_loop(
                 break
 
             # Handle pending tools
+            pending_tool_duration_ms = 0.0
             if last_assistant:
-                should_continue, user_input, step = await _handle_pending_tools(
+                (
+                    should_continue,
+                    user_input,
+                    step,
+                    pending_tool_duration_ms,
+                ) = await _handle_pending_tools(
                     last_assistant,
                     control,
                     ui,
@@ -555,7 +572,7 @@ async def agent_loop(
                 prompt_tokens=token_usage.get("prompt_tokens", 0),
                 completion_tokens=token_usage.get("completion_tokens", 0),
                 tool_calls=tool_calls_this_step,
-                tool_duration_ms=0,
+                tool_duration_ms=pending_tool_duration_ms,
             )
             metrics.record_step(step_metrics)
 
@@ -604,6 +621,8 @@ async def agent_loop(
                     ):
                         final_message.finish_reason = "max_steps"
 
+                    update_message(session_id, final_message)
+
         logger.info(f"Agent loop completed after {step} steps")
 
         # Finalize metrics
@@ -626,8 +645,8 @@ async def agent_loop(
 
 async def process_event(
     event: dict[str, Any], message: Message, current_text_part: TextPart
-) -> None:
-    """Process a streaming event from the LLM."""
+) -> TextPart:
+    """Process a streaming event from the LLM. Returns the (possibly new) current_text_part."""
     event_type = event.get("type")
 
     if event_type == "reasoning-delta":
@@ -674,7 +693,7 @@ async def process_event(
             message.finished = True
             message.finish_reason = "doom_loop"
             await bus.publish("finish", {"reason": "doom_loop", "message": "Doom loop detected"})
-            return
+            return current_text_part
 
         if current_text_part.text:
             current_text_part = TextPart()
@@ -685,6 +704,14 @@ async def process_event(
         tool_part = ToolPart(id=part_id, tool=tool_name, input=tool_input_dict)
         message.parts.append(tool_part)
 
+    elif event_type == "error":
+        error_msg = event.get("error", "Unknown error")
+        error_type = event.get("error_type", "UnknownError")
+        logger.error(f"LLM stream error: [{error_type}] {error_msg}")
+        message.finished = True
+        message.finish_reason = "error"
+        await bus.publish("finish", {"reason": "error", "error": error_msg})
+
     elif event_type == "finish":
         reason = event.get("reason", "unknown")
         logger.info(f"Received finish event: {reason}")
@@ -692,3 +719,5 @@ async def process_event(
         message.finish_reason = reason
         if reason == "stop":
             await bus.publish("finish", {"reason": reason})
+
+    return current_text_part

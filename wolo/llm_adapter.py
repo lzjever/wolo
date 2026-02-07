@@ -356,7 +356,10 @@ class WoloLLMClient:
 
 def get_token_usage() -> dict[str, int]:
     """Get token usage from last API call."""
-    return _token_usage_ctx.get().copy()
+    try:
+        return _token_usage_ctx.get().copy()
+    except LookupError:
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
 def reset_token_usage() -> None:

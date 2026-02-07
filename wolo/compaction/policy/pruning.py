@@ -260,7 +260,7 @@ class ToolOutputPruningPolicy(CompactionPolicy):
                     continue
 
                 # Skip already pruned outputs
-                if hasattr(part, "metadata") and part.metadata.get("pruned"):
+                if part.metadata and part.metadata.get("pruned"):
                     break  # Stop at already-pruned content
 
                 # Estimate tokens for this output
@@ -333,8 +333,6 @@ class ToolOutputPruningPolicy(CompactionPolicy):
         new_part.end_time = part.end_time
 
         # Add pruning metadata
-        if not hasattr(new_part, "metadata"):
-            new_part.metadata = {}
         new_part.metadata = {
             "pruned": True,
             "pruned_at": time.time(),

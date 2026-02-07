@@ -21,6 +21,7 @@ class EndpointConfig:
     api_key: str
     temperature: float = 0.7
     max_tokens: int = 16384
+    context_window: int = 128000  # Context window size (for compaction threshold)
     source_model: str | None = None
     enable_think: bool = False  # Enable reasoning mode for this endpoint
 
@@ -97,6 +98,7 @@ class Config:
     base_url: str
     temperature: float
     max_tokens: int
+    context_window: int = 128000  # Context window size (for compaction threshold)
     mcp_servers: list[str] = field(default_factory=list)
     debug_llm_file: str | None = None  # File to write LLM requests/responses for debugging
     debug_full_dir: str | None = None  # Directory to save full request/response logs
@@ -189,6 +191,7 @@ class Config:
                     api_key=ep["api_key"],
                     temperature=ep.get("temperature", 0.7),
                     max_tokens=ep.get("max_tokens", 16384),
+                    context_window=ep.get("context_window", 128000),
                     source_model=ep.get("source_model"),
                     enable_think=ep.get("enable_think", False),  # Load from endpoint
                 )
@@ -341,6 +344,7 @@ class Config:
             base_url_from_config = selected_endpoint.api_base
             temperature = selected_endpoint.temperature
             max_tokens = selected_endpoint.max_tokens
+            context_window = selected_endpoint.context_window
         else:
             # No config file - use environment variables only (no defaults)
             key = api_key or env_key
@@ -351,8 +355,18 @@ class Config:
                 )
             model_name = model or os.getenv("WOLO_MODEL", "gpt-4o-mini")
             base_url_from_config = os.getenv("WOLO_API_BASE", "https://api.openai.com/v1")
-            temperature = float(os.getenv("WOLO_TEMPERATURE", "0.7"))
-            max_tokens = int(os.getenv("WOLO_MAX_TOKENS", "16384"))
+            try:
+                temperature = float(os.getenv("WOLO_TEMPERATURE", "0.7"))
+            except ValueError:
+                temperature = 0.7
+            try:
+                max_tokens = int(os.getenv("WOLO_MAX_TOKENS", "16384"))
+            except ValueError:
+                max_tokens = 16384
+            try:
+                context_window = int(os.getenv("WOLO_CONTEXT_WINDOW", "128000"))
+            except ValueError:
+                context_window = 128000
 
         # Log warning if using config file API key (less secure)
         if not env_key and not api_key:
@@ -426,6 +440,7 @@ class Config:
             base_url=base_url_from_config,
             temperature=temperature,
             max_tokens=max_tokens,
+            context_window=context_window,
             mcp_servers=mcp_servers,
             enable_think=enable_think,
             claude=claude_config,

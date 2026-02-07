@@ -503,7 +503,7 @@ async def execute_tool(
 
                         # Execute in parallel
                         tasks = [
-                            execute_tool(sp, session_id=session_id, config=config)
+                            execute_tool(sp, agent_config=agent_config, session_id=session_id, config=config)
                             for sp in sub_parts
                         ]
                         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -560,10 +560,14 @@ async def execute_tool(
             )
 
     # Handle specific exceptions with proper error types
-    except (WoloToolError, WoloPathSafetyError):
-        # Re-raise our custom exceptions
+    except (WoloToolError, WoloPathSafetyError) as e:
+        # Set error status before re-raising so the finally block publishes correct state
+        tool_part.status = "error"
+        tool_part.output = tool_part.output or str(e)
         raise
     except FileNotFoundError as e:
+        tool_part.status = "error"
+        tool_part.output = f"Tool {tool_part.tool}: File not found - {e}"
         raise WoloToolError(
             f"Tool {tool_part.tool}: File not found - {e}",
             session_id=session_id,
@@ -571,6 +575,8 @@ async def execute_tool(
             error_type="FileNotFoundError",
         ) from e
     except PermissionError as e:
+        tool_part.status = "error"
+        tool_part.output = f"Tool {tool_part.tool}: Permission denied - {e}"
         raise WoloToolError(
             f"Tool {tool_part.tool}: Permission denied - {e}",
             session_id=session_id,
@@ -578,6 +584,8 @@ async def execute_tool(
             error_type="PermissionError",
         ) from e
     except OSError as e:
+        tool_part.status = "error"
+        tool_part.output = f"Tool {tool_part.tool}: OS error - {e}"
         raise WoloToolError(
             f"Tool {tool_part.tool}: OS error - {e}",
             session_id=session_id,
@@ -586,22 +594,26 @@ async def execute_tool(
         ) from e
     except Exception as e:
         # Catch-all for truly unexpected errors
+        tool_part.status = "error"
+        tool_part.output = f"Tool {tool_part.tool}: Unexpected error - {e}"
         raise WoloToolError(
             f"Tool {tool_part.tool}: Unexpected error - {e}",
             session_id=session_id,
             tool_name=tool_part.tool,
             error_type=type(e).__name__,
         ) from e
+    finally:
+        # Always record end time and publish tool-complete event,
+        # even when exceptions are raised (prevents stuck UI spinners)
+        if tool_part.start_time > 0:
+            tool_part.end_time = time.time()
+            duration = tool_part.end_time - tool_part.start_time
 
-    # Record end time and duration
-    tool_part.end_time = time.time()
-    duration = tool_part.end_time - tool_part.start_time
+            # Collect metadata for display (used by verbose mode)
+            tool_metadata = getattr(tool_part, "_metadata", {})
 
-    # Collect metadata for display (used by verbose mode)
-    tool_metadata = getattr(tool_part, "_metadata", {})
-
-    # Use registry for tool-complete event
-    complete_event = registry.format_tool_complete(
-        tool_part.tool, tool_part.output, tool_part.status, duration, tool_metadata
-    )
-    await bus.publish("tool-complete", complete_event)
+            # Use registry for tool-complete event
+            complete_event = registry.format_tool_complete(
+                tool_part.tool, tool_part.output, tool_part.status, duration, tool_metadata
+            )
+            await bus.publish("tool-complete", complete_event)

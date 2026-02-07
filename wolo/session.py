@@ -48,6 +48,7 @@ class ToolPart(Part):
     status: str = "pending"
     start_time: float = 0.0
     end_time: float = 0.0
+    metadata: dict[str, Any] | None = None
 
     def __init__(
         self,
@@ -65,6 +66,7 @@ class ToolPart(Part):
         self.status = status
         self.start_time = 0.0
         self.end_time = 0.0
+        self.metadata = None
 
 
 @dataclass
@@ -230,21 +232,17 @@ class SessionStorage:
         temp_path = path.with_suffix(".tmp")
         try:
             with open(temp_path, "w") as f:
-                # Get exclusive lock
+                # Get exclusive lock — held through rename for consistency
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 try:
                     json.dump(data, f, indent=2, ensure_ascii=False)
                     f.flush()
                     os.fsync(f.fileno())
+
+                    # Atomic rename while lock is still held
+                    temp_path.rename(path)
                 finally:
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-
-            # Ensure parent directory exists before rename
-            # (may be deleted by another process in parallel scenarios)
-            path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Atomic rename
-            temp_path.rename(path)
         except Exception as e:
             # Clean up temp file on error
             if temp_path.exists():
@@ -752,7 +750,7 @@ def _serialize_part(part: Part) -> dict[str, Any]:
     if isinstance(part, TextPart):
         return {"type": "text", "id": part.id, "text": part.text}
     elif isinstance(part, ToolPart):
-        return {
+        d = {
             "type": "tool",
             "id": part.id,
             "tool": part.tool,
@@ -762,6 +760,9 @@ def _serialize_part(part: Part) -> dict[str, Any]:
             "start_time": part.start_time,
             "end_time": part.end_time,
         }
+        if part.metadata:
+            d["metadata"] = part.metadata
+        return d
     else:
         return {"type": part.type, "id": part.id}
 
@@ -781,6 +782,10 @@ def _deserialize_part(data: dict[str, Any]) -> Part:
         )
         part.start_time = data.get("start_time", 0.0)
         part.end_time = data.get("end_time", 0.0)
+        if "metadata" in data:
+            import copy
+
+            part.metadata = copy.deepcopy(data["metadata"])
         return part
     else:
         return Part(id=data.get("id", ""), type=part_type)
@@ -969,7 +974,9 @@ def to_llm_messages(messages: list[Message]) -> list[dict[str, Any]]:
         if message.role == "assistant":
             tool_calls = []
             for part in tool_parts:
-                if part.status in ("pending", "running", "completed"):
+                # Only include tool_calls that have finished execution
+                # (pending/running have not been sent to the API yet)
+                if part.status in ("completed", "error", "partial", "interrupted"):
                     tool_calls.append(
                         {
                             "id": part.id,
@@ -992,12 +999,28 @@ def to_llm_messages(messages: list[Message]) -> list[dict[str, Any]]:
                 result.append(msg_data)
 
             for part in tool_parts:
-                if part.status == "completed":
+                if part.status == "completed" or part.status == "partial":
                     result.append(
                         {
                             "role": "tool",
                             "tool_call_id": part.id,
                             "content": part.output or "Tool completed",
+                        }
+                    )
+                elif part.status == "error":
+                    result.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": part.id,
+                            "content": part.output or "Tool execution failed",
+                        }
+                    )
+                elif part.status == "interrupted":
+                    result.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": part.id,
+                            "content": part.output or "[Tool execution interrupted by user]",
                         }
                     )
 
@@ -1017,7 +1040,7 @@ def get_session_dir(session_id: str) -> Path:
 
 
 def save_path_confirmations(session_id: str, confirmed_dirs: list[Path]) -> None:
-    """Save confirmed paths to session storage."""
+    """Save confirmed paths to session storage (atomic write via temp+rename)."""
     confirmation_file = get_session_dir(session_id) / "path_confirmations.json"
 
     data = {
@@ -1026,8 +1049,10 @@ def save_path_confirmations(session_id: str, confirmed_dirs: list[Path]) -> None
         "last_updated": datetime.now().isoformat(),
     }
 
-    with open(confirmation_file, "w") as f:
+    tmp_file = confirmation_file.with_suffix(".json.tmp")
+    with open(tmp_file, "w") as f:
         json.dump(data, f, indent=2)
+    tmp_file.replace(confirmation_file)
 
 
 def load_path_confirmations(session_id: str) -> list[Path]:
@@ -1037,8 +1062,11 @@ def load_path_confirmations(session_id: str) -> list[Path]:
     if not confirmation_file.exists():
         return []
 
-    with open(confirmation_file) as f:
-        data = json.load(f)
+    try:
+        with open(confirmation_file) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return []
 
     return [Path(p) for p in data.get("confirmed_dirs", [])]
 

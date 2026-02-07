@@ -106,7 +106,7 @@ async def ask_questions(
         return []
 
     # 创建 Future 等待答案
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     future: asyncio.Future[list[Answer]] = loop.create_future()
     question_id = f"{session_id}_{id(future)}"
     _pending_questions[question_id] = future

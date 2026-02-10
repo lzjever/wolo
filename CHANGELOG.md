@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-02-10
+
+### Added
+
+- **One-click installation scripts** for all platforms (Linux, macOS, Windows)
+  - `install.sh` - Bash installer for Unix-like systems
+  - `install.ps1` - PowerShell installer for Windows
+  - `install.py` - Universal Python-based installer
+- Multiple installation methods support (auto, uv, pip, source)
+- Comprehensive installation documentation (`docs/INSTALLATION.md`)
+- Installation script design documentation (`scripts/INSTALLATION_DESIGN.md`)
+
+### Changed
+
+- Updated README with one-click installation section
+- Installation methods now documented with examples
+
 ## [0.3.0] - 2026-02-06
 
 ### Added

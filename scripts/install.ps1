@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 # Configuration
-$RepoUrl = "https://github.com/mbos-agent/wolo"
+$RepoUrl = "https://github.com/lzjever/wolo"
 $PythonMinVersion = [version]"3.10"
 $PythonMaxVersion = [version]"3.15"
 $WoloHome = if ($env:WOLO_HOME) { $env:WOLO_HOME } else { Join-Path $env:USERPROFILE ".wolo" }
@@ -291,7 +291,7 @@ function Show-PostInstall {
     Write-Host ""
     Write-Host "For more information:" -ForegroundColor Cyan
     Write-Host "  GitHub: $RepoUrl"
-    Write-Host "  Docs:   https://github.com/mbos-agent/wolo#readme"
+    Write-Host "  Docs:   https://github.com/lzjever/wolo#readme"
     Write-Host ""
 }
 

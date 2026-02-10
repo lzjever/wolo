@@ -149,7 +149,7 @@ pip install --upgrade mbos-wolo
 
 ```bash
 # Clone repository
-git clone https://github.com/mbos-agent/wolo.git
+git clone https://github.com/lzjever/wolo.git
 cd wolo
 
 # Using uv (recommended)

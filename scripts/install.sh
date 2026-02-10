@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_URL="https://github.com/mbos-agent/wolo"
+REPO_URL="https://github.com/lzjever/wolo"
 INSTALL_METHOD="${WOLO_INSTALL_METHOD:-auto}" # auto, pip, uv, pyflow
 PYTHON_MIN_VERSION="3.10"
 PYTHON_MAX_VERSION="3.15"
@@ -254,7 +254,7 @@ show_post_install() {
     echo ""
     echo "For more information:"
     echo "  GitHub: $REPO_URL"
-    echo "  Docs:   https://github.com/mbos-agent/wolo#readme"
+    echo "  Docs:   https://github.com/lzjever/wolo#readme"
     echo ""
 }
 

@@ -60,7 +60,7 @@ pip install mbos-wolo
 
 **From Source:**
 ```bash
-git clone https://github.com/mbos-agent/wolo.git
+git clone https://github.com/lzjever/wolo.git
 cd wolo
 
 # Using uv

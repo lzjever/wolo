@@ -13,8 +13,57 @@ Wolo is a minimal Python AI agent CLI tool, similar to Claude Code or opencode. 
 
 ## Installation
 
+### One-Click Installation (Recommended)
+
+**Linux / macOS:**
+```bash
+curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 | iex
+```
+
+**Universal (Python):**
+```bash
+python3 -c "$(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
+```
+
+### Installation Methods
+
+The installer supports multiple methods:
+
+- **auto** (default): Automatically selects the best method (uv if available, otherwise pip)
+- **uv**: Uses the `uv` package manager for faster installation
+- **pip**: Standard pip installation
+- **source**: Installs from git source
+
+```bash
+# Specify installation method
+WOLO_INSTALL_METHOD=uv bash <(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh)
+
+# Or using the Python installer
+python3 <(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py) --method uv
+```
+
+### Manual Installation
+
+**From PyPI:**
 ```bash
 # Using uv (recommended)
+uv pip install mbos-wolo
+
+# Or using pip
+pip install mbos-wolo
+```
+
+**From Source:**
+```bash
+git clone https://github.com/mbos-agent/wolo.git
+cd wolo
+
+# Using uv
 uv sync
 
 # Or using pip

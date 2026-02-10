@@ -2,6 +2,63 @@
 
 This directory contains utility scripts for development and testing.
 
+## Installation Scripts
+
+### install.sh (Linux / macOS)
+
+One-click installation script for Unix-like systems.
+
+**Usage:**
+```bash
+curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+```
+
+**Features:**
+- Automatic Python detection (3.10-3.15)
+- Supports multiple installation methods (uv, pip, source)
+- User or system-wide installation
+- PATH configuration reminders
+- Colorized output
+
+**Environment Variables:**
+- `WOLO_INSTALL_METHOD`: Installation method (auto, uv, pip, source)
+- `WOLO_HOME`: Installation directory (default: ~/.wolo)
+
+### install.ps1 (Windows)
+
+PowerShell one-click installation script for Windows.
+
+**Usage:**
+```powershell
+irm https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 | iex
+```
+
+**Features:**
+- Python detection from common paths
+- `py` launcher support
+- Virtual environment via uv
+- Creates batch and PowerShell wrappers
+- PATH update reminders
+
+### install.py (Universal)
+
+Python-based cross-platform installer.
+
+**Usage:**
+```bash
+python3 -c "$(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
+python3 install.py --method uv
+python3 install.py --help
+```
+
+**Features:**
+- Cross-platform compatibility
+- Command-line argument support
+- Detailed error messages
+- Can be inspected before running
+
+## Development Scripts
+
 ## generate_release_notes.py
 
 **Main script for generating release notes.** Used by GitHub Actions workflows and can be run locally for testing.

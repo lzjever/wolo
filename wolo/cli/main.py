@@ -74,12 +74,13 @@ def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
 
     ROUTING PRIORITY (STRICT ORDER):
     1. Help: -h, --help (highest priority)
-    2. Quick commands: -l, -w
-    3. Mode flags: --repl (routes to REPL mode)
-    4. Subcommands: session, config
-    5. REPL entry: chat
-    6. Execution: prompt provided (CLI or stdin)
-    7. Default: show brief help (no input)
+    2. Version: --version, -V
+    3. Quick commands: -l, -w
+    4. Mode flags: --repl (routes to REPL mode)
+    5. Subcommands: session, config
+    6. REPL entry: chat
+    7. Execution: prompt provided (CLI or stdin)
+    8. Default: show brief help (no input)
 
     Args:
         args: Command-line arguments
@@ -98,7 +99,11 @@ def _route_command(args: list[str], has_stdin: bool) -> tuple[str, list[str]]:
         if len(args) > 2 and args[2] in ("-h", "--help"):
             return ("help", [first, args[1]])
 
-    # 2. Quick commands (check BEFORE stdin and subcommands)
+    # 2. Version command
+    if args and args[0] in ("--version", "-V"):
+        return ("version", [])
+
+    # 3. Quick commands (check BEFORE stdin and subcommands)
     if args:
         first = args[0]
         # Quick list command
@@ -209,6 +214,13 @@ def main() -> int:
         parsed.command_type = "help"
         parsed.positional_args = remaining_args if remaining_args else ["main"]
         return show_help(parsed)
+
+    # Handle version command
+    if command_type == "version":
+        from wolo import __version__
+
+        print(f"wolo {__version__}")
+        return ExitCode.SUCCESS
 
     # Handle quick commands that don't need parsing
     if command_type == "session_list":

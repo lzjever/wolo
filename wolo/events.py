@@ -1,8 +1,11 @@
 """Event bus for UI updates and agent events."""
 
 import inspect
+import logging
 from collections.abc import Callable
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class EventBus:
@@ -19,10 +22,18 @@ class EventBus:
     async def publish(self, event_type: str, data: dict[str, Any]) -> None:
         """异步发布事件，支持异步订阅者"""
         for callback in self._subscribers.get(event_type, []):
-            if inspect.iscoroutinefunction(callback):
-                await callback(data)
-            else:
-                callback(data)
+            try:
+                if inspect.iscoroutinefunction(callback):
+                    await callback(data)
+                else:
+                    callback(data)
+            except Exception:
+                logger.error(
+                    "EventBus subscriber %r failed on event %s",
+                    callback,
+                    event_type,
+                    exc_info=True,
+                )
 
 
 # Global event bus instance

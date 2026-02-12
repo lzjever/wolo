@@ -290,6 +290,23 @@ async def run_repl_mode(
                     print(f"\n{DIM}Exiting REPL mode{RESET}")
                     break
 
+            # Handle slash commands
+            if current_message.startswith("/"):
+                from wolo.cli.slash import handle_slash_command
+
+                slash_result = await handle_slash_command(
+                    session_id, current_message, config, agent_config
+                )
+                if slash_result.handled:
+                    if slash_result.output:
+                        print(slash_result.output)
+                    if slash_result.inject_as_user_message:
+                        # Replace current_message with the injected message
+                        current_message = slash_result.inject_as_user_message
+                    else:
+                        current_message = None
+                        continue
+
             # Add user message (no display)
             add_user_message(session_id, current_message)
             task_count += 1

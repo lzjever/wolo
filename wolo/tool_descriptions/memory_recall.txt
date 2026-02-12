@@ -1,0 +1,5 @@
+Search and recall previously saved memories by keyword.
+
+Use this tool to find and load knowledge from past sessions. The query is matched against memory titles, summaries, and tags.
+
+Returns the full content of matching memories so you can use the recalled knowledge in the current conversation.

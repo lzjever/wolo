@@ -1,0 +1,3 @@
+List all saved memories with their titles, summaries, tags, and timestamps.
+
+Optionally filter by tag to show only relevant memories. Use this to help the user browse their saved knowledge.

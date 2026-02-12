@@ -34,6 +34,7 @@ def mock_config(temp_storage_dir):
     """Create mock LLM config."""
     config = MagicMock(spec=Config)
     config.max_tokens = 10000
+    config.context_window = 10000
     config.model = "test-model"
     config.api_key = "test-key"
     config.base_url = "https://test.api"

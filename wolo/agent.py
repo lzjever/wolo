@@ -291,6 +291,7 @@ async def _call_llm(
     control: Optional["ControlManager"],
     assistant_msg: Message,
     excluded_tools: set[str] = None,
+    agent_config: "AgentConfig | None" = None,
 ) -> tuple[Message, list[dict], bool, float]:
     """Call LLM and handle streaming. Returns (assistant_msg, tool_calls, interrupted, llm_start_time)."""
     # Check if we need compaction using the new CompactionManager
@@ -322,6 +323,10 @@ async def _call_llm(
     # Build LLM messages
     llm_messages = to_llm_messages(messages_to_use)
     logger.debug(f"Built {len(llm_messages)} LLM messages")
+
+    # Inject system prompt from agent config
+    if agent_config and agent_config.system_prompt:
+        llm_messages.insert(0, {"role": "system", "content": agent_config.system_prompt})
 
     # Add max_steps warning if approaching limit
     is_last_step = step >= max_steps - 1
@@ -534,6 +539,7 @@ async def agent_loop(
                     control,
                     assistant_msg,
                     excluded_tools=excluded_tools,
+                    agent_config=agent_config,
                 )
             except Exception as e:
                 metrics.record_tool_error("llm", type(e).__name__)

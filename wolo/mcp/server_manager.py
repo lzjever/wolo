@@ -374,7 +374,7 @@ class MCPServerManager:
         """
         schemas = []
         for server_name, tool in self.get_all_tools():
-            name = f"mcp_{server_name}_{tool.name}" if prefix else tool.name
+            name = f"mcp_{server_name}__{tool.name}" if prefix else tool.name
             schemas.append(
                 {
                     "type": "function",
@@ -424,15 +424,15 @@ class MCPServerManager:
         Returns:
             Tool result
         """
-        # Parse the name: mcp_<server>_<tool>
+        # Parse the name: mcp_<server>__<tool>
         if not full_name.startswith("mcp_"):
             raise MCPError(f"Invalid MCP tool name: {full_name}")
 
-        parts = full_name[4:].split("_", 1)
-        if len(parts) != 2:
+        remainder = full_name[4:]
+        if "__" not in remainder:
             raise MCPError(f"Invalid MCP tool name format: {full_name}")
 
-        server_name, tool_name = parts
+        server_name, tool_name = remainder.split("__", 1)
         return await self.call_tool(server_name, tool_name, arguments)
 
     def get_status(self) -> dict[str, dict[str, Any]]:

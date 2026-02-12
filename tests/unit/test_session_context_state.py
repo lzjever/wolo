@@ -53,10 +53,7 @@ async def test_session_todos_isolated():
         await asyncio.sleep(0.01)
         results.append(get_session_todos())
 
-    async def run_both():
-        await asyncio.gather(session1(), session2())
-
-    asyncio.run(run_both())
+    await asyncio.gather(session1(), session2())
 
     # With asyncio.gather in the same task, the second set_session_todos
     # overwrites the first. Both will return the last set value.

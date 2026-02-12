@@ -132,10 +132,12 @@ class CompactionManager:
 
         # Calculate token usage
         current_tokens = TokenEstimator.estimate_messages(messages)
-        limit_tokens = self._llm_config.max_tokens - self._config.reserved_tokens
+        limit_tokens = (
+            getattr(self._llm_config, "context_window", 128000) - self._config.reserved_tokens
+        )
 
         if limit_tokens <= 0:
-            limit_tokens = self._llm_config.max_tokens
+            limit_tokens = getattr(self._llm_config, "context_window", 128000)
 
         overflow_ratio = current_tokens / limit_tokens if limit_tokens > 0 else 0.0
 
@@ -203,10 +205,12 @@ class CompactionManager:
 
         # Calculate initial state
         original_tokens = TokenEstimator.estimate_messages(messages)
-        limit_tokens = self._llm_config.max_tokens - self._config.reserved_tokens
+        limit_tokens = (
+            getattr(self._llm_config, "context_window", 128000) - self._config.reserved_tokens
+        )
 
         if limit_tokens <= 0:
-            limit_tokens = self._llm_config.max_tokens
+            limit_tokens = getattr(self._llm_config, "context_window", 128000)
 
         # Check if compaction is actually needed
         if original_tokens <= limit_tokens:

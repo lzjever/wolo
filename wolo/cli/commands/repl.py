@@ -193,6 +193,21 @@ class ReplCommand(BaseCommand):
         )
         setup_event_handlers(output_config)
 
+        # Load long-term memories if requested (-M/--load-ltm)
+        if args.execution_options.load_ltm:
+            from wolo.tools_pkg.memory import load_memories_for_session
+
+            ltm_context = load_memories_for_session(args.execution_options.load_ltm)
+            if ltm_context:
+                # Prepend to initial message or set as initial message
+                if message:
+                    message = f"{ltm_context}\n\n{message}"
+                else:
+                    message = ltm_context
+            else:
+                not_found = ", ".join(args.execution_options.load_ltm)
+                print(f"Warning: No long-term memories found for: {not_found}", file=sys.stderr)
+
         # Print session info banner (unless --no-banner)
         if not args.execution_options.no_banner:
             from wolo.cli.utils import print_session_info

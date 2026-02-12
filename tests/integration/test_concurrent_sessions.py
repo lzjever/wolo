@@ -101,6 +101,9 @@ async def test_context_var_isolation_with_copy_context():
     """ContextVars are isolated when using copy_context."""
     from contextvars import copy_context
 
+    # Initialize the context var before copying, so both contexts start with the same value
+    reset_api_token_usage()
+
     ctx1 = copy_context()
     ctx2 = copy_context()
 
@@ -109,7 +112,7 @@ async def test_context_var_isolation_with_copy_context():
         _token_usage_ctx.set, {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
     )
 
-    # ctx2 should still have default
+    # ctx2 should still have the initial (zero) value
     assert ctx2.run(_token_usage_ctx.get) == {
         "prompt_tokens": 0,
         "completion_tokens": 0,

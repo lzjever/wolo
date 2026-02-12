@@ -44,5 +44,6 @@ class SessionCancelled(PathGuardError):  # noqa: N818
     This is a control flow exception for clean session termination.
     """
 
-    def __init__(self):
+    def __init__(self, path: str = ""):
+        self.path = path
         super().__init__("Session cancelled")

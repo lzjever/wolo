@@ -92,6 +92,19 @@ class PathSafetyConfig:
 
 
 @dataclass
+class LTMConfig:
+    """Configuration for long-term memory (LTM).
+
+    Distinct from chat history / context memory — LTM persists across sessions.
+    """
+
+    enabled: bool = True
+    storage_dir: Path = field(default_factory=lambda: Path.home() / ".wolo" / "memories")
+    max_memories: int = 1000
+    max_ltm_size: int = 12000  # Max content size per memory entry in characters
+
+
+@dataclass
 class Config:
     api_key: str
     model: str
@@ -114,6 +127,9 @@ class Config:
 
     # Path safety configuration
     path_safety: PathSafetyConfig = field(default_factory=PathSafetyConfig)
+
+    # Long-term memory (LTM) configuration
+    ltm: LTMConfig = field(default_factory=LTMConfig)
 
     # Compaction configuration (lazy import to avoid circular dependency)
     compaction: Any = None  # Type: CompactionConfig | None

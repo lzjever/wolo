@@ -34,7 +34,7 @@ SHELL_HIGH_RISK_PATTERNS: list[dict[str, str]] = [
     },
     {
         "id": "dd_to_block_device",
-        "regex": r"\bdd\b[^\\n]*\bof=/dev/",
+        "regex": r"\bdd\b[^\n]*\bof=/dev/",
         "description": "Raw write to block device",
     },
     {
@@ -44,7 +44,7 @@ SHELL_HIGH_RISK_PATTERNS: list[dict[str, str]] = [
     },
     {
         "id": "curl_pipe_shell",
-        "regex": r"\b(curl|wget)\b[^\\n]*\|\s*(sh|bash|zsh)\b",
+        "regex": r"\b(curl|wget)\b[^\n]*\|\s*(sh|bash|zsh)\b",
         "description": "Remote script piped to shell",
     },
     {

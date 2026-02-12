@@ -366,6 +366,68 @@ async def execute_tool(
             tool_part.output = result["output"]
             tool_part.status = "completed"
 
+        elif tool_part.tool == "memory_save":
+            from wolo.tools_pkg.memory import memory_save_execute
+
+            summary = tool_part.input.get("summary", "")
+            tags = tool_part.input.get("tags", [])
+            # Build context from current session
+            import os
+
+            context = {"workdir": os.getcwd()}
+
+            # Get recent messages for LLM summarization
+            messages_for_llm = None
+            if session_id and config:
+                try:
+                    from wolo.session import get_session_messages, to_llm_messages
+
+                    session_msgs = get_session_messages(session_id)
+                    messages_for_llm = to_llm_messages(session_msgs)
+                except Exception:
+                    pass
+
+            # Get max_content_size from LTM config
+            max_content_size = 12000
+            if config:
+                max_content_size = getattr(getattr(config, "ltm", None), "max_ltm_size", 12000)
+
+            result = await memory_save_execute(
+                summary=summary,
+                tags=tags,
+                context=context,
+                session_id=session_id,
+                messages=messages_for_llm,
+                config=config,
+                max_content_size=max_content_size,
+            )
+            tool_part.output = result["output"]
+            tool_part.status = "completed"
+
+        elif tool_part.tool == "memory_recall":
+            from wolo.tools_pkg.memory import memory_recall_execute
+
+            query = tool_part.input.get("query", "")
+            result = await memory_recall_execute(query)
+            tool_part.output = result["output"]
+            tool_part.status = "completed"
+
+        elif tool_part.tool == "memory_list":
+            from wolo.tools_pkg.memory import memory_list_execute
+
+            tag_filter = tool_part.input.get("tag_filter")
+            result = await memory_list_execute(tag_filter)
+            tool_part.output = result["output"]
+            tool_part.status = "completed"
+
+        elif tool_part.tool == "memory_delete":
+            from wolo.tools_pkg.memory import memory_delete_execute
+
+            memory_id = tool_part.input.get("memory_id", "")
+            result = await memory_delete_execute(memory_id)
+            tool_part.output = result["output"]
+            tool_part.status = "completed" if result["metadata"].get("error") is None else "error"
+
         elif tool_part.tool.startswith("mcp_"):
             # Handle MCP server tools
             from wolo.mcp_integration import call_mcp_tool
@@ -503,7 +565,9 @@ async def execute_tool(
 
                         # Execute in parallel
                         tasks = [
-                            execute_tool(sp, agent_config=agent_config, session_id=session_id, config=config)
+                            execute_tool(
+                                sp, agent_config=agent_config, session_id=session_id, config=config
+                            )
                             for sp in sub_parts
                         ]
                         results = await asyncio.gather(*tasks, return_exceptions=True)

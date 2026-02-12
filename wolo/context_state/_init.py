@@ -12,6 +12,10 @@ from wolo.context_state.vars import (
 )
 
 
+def _default_token_usage() -> dict[str, int]:
+    return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
 def get_api_token_usage() -> dict[str, int]:
     """Get a copy of the current API token usage.
 
@@ -19,12 +23,17 @@ def get_api_token_usage() -> dict[str, int]:
         A dictionary with keys: prompt_tokens, completion_tokens, total_tokens.
         The returned dict is a copy; modifying it won't affect the context state.
     """
-    return _token_usage_ctx.get().copy()
+    try:
+        return _token_usage_ctx.get().copy()
+    except LookupError:
+        val = _default_token_usage()
+        _token_usage_ctx.set(val)
+        return val.copy()
 
 
 def reset_api_token_usage() -> None:
     """Reset API token usage to zero."""
-    _token_usage_ctx.set({"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+    _token_usage_ctx.set(_default_token_usage())
 
 
 def get_doom_loop_history() -> list[tuple[str, str, str]]:
@@ -34,7 +43,11 @@ def get_doom_loop_history() -> list[tuple[str, str, str]]:
         A list of tuples (tool_name, tool_input, tool_output).
         The returned list is a copy; modifying it won't affect the context state.
     """
-    return _doom_loop_history_ctx.get().copy()
+    try:
+        return _doom_loop_history_ctx.get().copy()
+    except LookupError:
+        _doom_loop_history_ctx.set([])
+        return []
 
 
 def add_doom_loop_entry(entry: tuple[str, str, str]) -> None:
@@ -44,7 +57,10 @@ def add_doom_loop_entry(entry: tuple[str, str, str]) -> None:
         entry: A tuple (tool_name, tool_input, tool_output) representing
                a tool call that may be part of a doom loop.
     """
-    history = _doom_loop_history_ctx.get()
+    try:
+        history = _doom_loop_history_ctx.get()
+    except LookupError:
+        history = []
     new_history = history.copy()
     new_history.append(entry)
     _doom_loop_history_ctx.set(new_history)
@@ -62,7 +78,11 @@ def get_session_todos() -> list[dict]:
         A list of todo dictionaries.
         The returned list is a copy; modifying it won't affect the context state.
     """
-    return _session_todos_ctx.get().copy()
+    try:
+        return _session_todos_ctx.get().copy()
+    except LookupError:
+        _session_todos_ctx.set([])
+        return []
 
 
 def set_session_todos(todos: list[dict]) -> None:

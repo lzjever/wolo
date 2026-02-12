@@ -247,6 +247,17 @@ class RunCommand(BaseCommand):
         ):
             print_session_info(session_id, show_resume_hints=False, output_config=output_config)
 
+        # Load long-term memories if requested (-M/--load-ltm)
+        if args.execution_options.load_ltm:
+            from wolo.tools_pkg.memory import load_memories_for_session
+
+            ltm_context = load_memories_for_session(args.execution_options.load_ltm)
+            if ltm_context:
+                message = f"{ltm_context}\n\n{message}"
+            else:
+                not_found = ", ".join(args.execution_options.load_ltm)
+                print(f"Warning: No long-term memories found for: {not_found}", file=sys.stderr)
+
         # Setup event handlers
         setup_event_handlers(output_config)
 

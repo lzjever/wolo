@@ -29,6 +29,7 @@ SHORT_OPTIONS = {
     "-C": "--workdir",
     "-P": "--allow-path",
     "-W": "--wild",
+    "-M": "--load-ltm",
 }
 
 # Options that require values
@@ -54,8 +55,10 @@ OPTIONS_NEEDING_VALUE = {
     "--output-style",
     "--workdir",
     "--allow-path",
+    "--load-ltm",
     "-C",
     "-P",
+    "-M",
 }
 
 # Valid output style choices
@@ -70,7 +73,14 @@ MUTUALLY_EXCLUSIVE_GROUPS = [
 ]
 
 # Options that can be specified multiple times
-MULTI_VALUE_OPTIONS: set[str] = {"allow-path", "--allow-path", "-P"}
+MULTI_VALUE_OPTIONS: set[str] = {
+    "allow-path",
+    "--allow-path",
+    "-P",
+    "load-ltm",
+    "--load-ltm",
+    "-M",
+}
 
 # Template for combining pipe input with CLI prompt
 DUAL_INPUT_TEMPLATE = """## Context (from stdin)
@@ -115,6 +125,8 @@ class ExecutionOptions:
     wild_mode: bool = False
     # Whether wild mode was explicitly set by CLI flag.
     wild_mode_explicit: bool = False
+    # Long-term memory IDs/queries to load at startup (-M/--load-ltm, repeatable)
+    load_ltm: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -503,3 +515,20 @@ class FlexibleArgumentParser:
             seen: set[str] = set()
             ordered = [p for p in allow_paths if not (p in seen or seen.add(p))]
             result.execution_options.allow_paths = ordered
+
+        # Load long-term memories at startup (-M/--load-ltm)
+        load_ltm: list[str] = []
+        ltm_value = options.get("--load-ltm")
+        if isinstance(ltm_value, list):
+            load_ltm.extend(ltm_value)
+        elif isinstance(ltm_value, str):
+            load_ltm.append(ltm_value)
+        else:
+            for key in ("-M", "load-ltm"):
+                value = options.get(key)
+                if isinstance(value, list):
+                    load_ltm.extend(value)
+                elif isinstance(value, str):
+                    load_ltm.append(value)
+        if load_ltm:
+            result.execution_options.load_ltm = load_ltm

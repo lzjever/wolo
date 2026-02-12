@@ -1,0 +1,7 @@
+Save important knowledge or skills to long-term memory for future sessions.
+
+Use this tool when the user asks you to remember something, or when you encounter important knowledge that should be preserved across sessions.
+
+The tool will analyze the current conversation context and generate a structured memory entry with title, summary, tags, and detailed content.
+
+Memories are stored globally at ~/.wolo/memories/ and can be recalled in any future session using memory_recall.

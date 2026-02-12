@@ -96,14 +96,39 @@ async def _generate_memory_summary(
 
         # Extract JSON from response
         response_text = response_text.strip()
+
+        # Try to find JSON in code blocks first
         if "```json" in response_text:
             start = response_text.find("```json") + 7
             end = response_text.find("```", start)
-            response_text = response_text[start:end].strip()
+            if end > start:
+                response_text = response_text[start:end].strip()
         elif "```" in response_text:
             start = response_text.find("```") + 3
             end = response_text.find("```", start)
-            response_text = response_text[start:end].strip()
+            if end > start:
+                response_text = response_text[start:end].strip()
+
+        # Try to find JSON object directly
+        if not response_text.startswith("{"):
+            start = response_text.find("{")
+            if start >= 0:
+                response_text = response_text[start:]
+
+        # Find matching closing brace
+        brace_count = 0
+        end_pos = 0
+        for i, c in enumerate(response_text):
+            if c == "{":
+                brace_count += 1
+            elif c == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    end_pos = i + 1
+                    break
+
+        if end_pos > 0:
+            response_text = response_text[:end_pos]
 
         return json.loads(response_text)
 

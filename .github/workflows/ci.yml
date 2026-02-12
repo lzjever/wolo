@@ -33,7 +33,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run tests
-        run: uv run pytest --cov=wolo --cov-report=xml --cov-report=term-missing -v -n auto
+        run: uv run pytest --cov=wolo --cov-report=xml --cov-report=term-missing -v
 
   lint:
     name: Lint & Format

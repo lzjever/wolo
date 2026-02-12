@@ -38,12 +38,6 @@ async def handle_slash_command(
 
     if command == "/remember":
         return await _handle_remember(session_id, args, config)
-    elif command == "/recall":
-        return await _handle_recall(args)
-    elif command == "/memories":
-        return await _handle_memories(args)
-    elif command == "/forget":
-        return await _handle_forget(args)
     else:
         return SlashResult(handled=False, output="")
 
@@ -73,37 +67,3 @@ async def _handle_remember(session_id: str, args: str, config=None) -> SlashResu
         output="",
         inject_as_user_message=message,
     )
-
-
-async def _handle_recall(args: str) -> SlashResult:
-    """Handle /recall [query] command."""
-    if not args:
-        return SlashResult(handled=True, output="Usage: /recall <query>")
-
-    from wolo.tools_pkg.memory import memory_recall_execute
-
-    result = await memory_recall_execute(args)
-    return SlashResult(handled=True, output=result["output"])
-
-
-async def _handle_memories(args: str) -> SlashResult:
-    """Handle /memories command."""
-    tag_filter = args.strip() if args.strip() else None
-
-    from wolo.tools_pkg.memory import memory_list_execute
-
-    result = await memory_list_execute(tag_filter)
-    return SlashResult(handled=True, output=result["output"])
-
-
-async def _handle_forget(args: str) -> SlashResult:
-    """Handle /forget [id] command."""
-    if not args:
-        return SlashResult(handled=True, output="Usage: /forget <memory_id>")
-
-    memory_id = args.strip()
-
-    from wolo.tools_pkg.memory import memory_delete_execute
-
-    result = await memory_delete_execute(memory_id)
-    return SlashResult(handled=True, output=result["output"])

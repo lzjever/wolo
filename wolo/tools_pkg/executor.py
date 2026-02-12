@@ -408,15 +408,20 @@ async def execute_tool(
             # Handle MCP server tools
             from wolo.mcp_integration import call_mcp_tool
 
-            result = await call_mcp_tool(tool_part.tool, tool_part.input)
-            # Extract text content from MCP result
-            content = result.get("content", [])
-            if content and isinstance(content, list):
-                text_parts = [c.get("text", "") for c in content if c.get("type") == "text"]
-                tool_part.output = "\n".join(text_parts)
-            else:
-                tool_part.output = str(result)
-            tool_part.status = "error" if result.get("isError") else "completed"
+            try:
+                result = await call_mcp_tool(tool_part.tool, tool_part.input)
+                # Extract text content from MCP result
+                content = result.get("content", [])
+                if content and isinstance(content, list):
+                    text_parts = [c.get("text", "") for c in content if c.get("type") == "text"]
+                    tool_part.output = "\n".join(text_parts)
+                else:
+                    tool_part.output = str(result)
+                tool_part.status = "error" if result.get("isError") else "completed"
+            except Exception as e:
+                tool_part.status = "error"
+                tool_part.output = f"MCP tool '{tool_part.tool}' failed: {e}"
+                logger.warning(f"MCP tool call failed: {tool_part.tool}: {e}")
 
         elif tool_part.tool == "task":
             agent = tool_part.input.get("agent", "")

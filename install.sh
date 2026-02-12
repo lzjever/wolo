@@ -27,7 +27,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-WOLO_REPO="mbos-agent/wolo"
+WOLO_REPO="lzjever/wolo"
 WOLO_PYPI="mbos-wolo"
 METHOD="${METHOD:-uv}"
 VERSION="${VERSION:-}"

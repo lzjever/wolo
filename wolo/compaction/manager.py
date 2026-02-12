@@ -130,8 +130,22 @@ class CompactionManager:
                 applicable_policies=(),
             )
 
-        # Calculate token usage
-        current_tokens = TokenEstimator.estimate_messages(messages)
+        # Calculate token usage - prefer actual token counts from LLM responses
+        from wolo.session import get_session_token_usage
+
+        actual_input_tokens, actual_output_tokens = get_session_token_usage(session_id)
+
+        # Use actual tokens if available (more accurate), otherwise estimate
+        if actual_input_tokens > 0:
+            # Actual tokens: input + estimated output (output varies, estimate is acceptable)
+            estimated_output = TokenEstimator.estimate_messages(messages) - actual_input_tokens
+            current_tokens = actual_input_tokens + max(0, estimated_output)
+            token_source = "actual"
+        else:
+            # Fallback to estimation
+            current_tokens = TokenEstimator.estimate_messages(messages)
+            token_source = "estimated"
+
         limit_tokens = (
             getattr(self._llm_config, "context_window", 128000) - self._config.reserved_tokens
         )
@@ -147,7 +161,7 @@ class CompactionManager:
         if not should_compact:
             return CompactionDecision(
                 should_compact=False,
-                reason=f"Token usage ({overflow_ratio:.1%}) below threshold ({self._config.overflow_threshold:.1%})",
+                reason=f"Token usage ({overflow_ratio:.1%}, {token_source}) below threshold ({self._config.overflow_threshold:.1%})",
                 current_tokens=current_tokens,
                 limit_tokens=limit_tokens,
                 overflow_ratio=overflow_ratio,
@@ -171,7 +185,7 @@ class CompactionManager:
 
         return CompactionDecision(
             should_compact=True,
-            reason=f"Token usage ({overflow_ratio:.1%}) exceeds threshold ({self._config.overflow_threshold:.1%})",
+            reason=f"Token usage ({overflow_ratio:.1%}, {token_source}) exceeds threshold ({self._config.overflow_threshold:.1%})",
             current_tokens=current_tokens,
             limit_tokens=limit_tokens,
             overflow_ratio=overflow_ratio,

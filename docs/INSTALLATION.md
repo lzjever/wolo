@@ -16,7 +16,7 @@ This document describes the various ways to install Wolo, including one-click in
 
 ```bash
 # Recommended: One-click install
-curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lzjever/wolo/main/install.sh | bash
 
 # Or: Using uv tool (fastest)
 uv tool install mbos-wolo
@@ -25,7 +25,7 @@ uv tool install mbos-wolo
 pipx install mbos-wolo
 
 # Or (macOS): Using Homebrew
-brew install --formula https://raw.githubusercontent.com/mbos-agent/wolo/main/homebrew/wolo.rb
+brew install --formula https://raw.githubusercontent.com/lzjever/wolo/main/homebrew/wolo.rb
 ```
 
 ## One-Click Installation
@@ -42,16 +42,16 @@ The shell script installer (`install.sh`) supports:
 
 ```bash
 # Basic installation (uses uv by default)
-curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lzjever/wolo/main/install.sh | bash
 
 # Using wget
-wget -qO- https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/lzjever/wolo/main/install.sh | bash
 
 # With specific installation method
-METHOD=pipx curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+METHOD=pipx curl -fsSL https://raw.githubusercontent.com/lzjever/wolo/main/install.sh | bash
 
 # Download and inspect first
-curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh
+curl -O https://raw.githubusercontent.com/lzjever/wolo/main/install.sh
 less install.sh
 bash install.sh
 ```
@@ -66,10 +66,10 @@ The PowerShell installer (`install.ps1`) supports:
 
 ```powershell
 # Basic installation
-irm https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.ps1 | iex
 
 # Download and inspect first
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 -OutFile install.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.ps1 -OutFile install.ps1
 Get-Content install.ps1
 .\install.ps1
 ```
@@ -130,10 +130,10 @@ Native macOS package manager experience.
 
 ```bash
 # Install from formula URL
-brew install --formula https://raw.githubusercontent.com/mbos-agent/wolo/main/homebrew/wolo.rb
+brew install --formula https://raw.githubusercontent.com/lzjever/wolo/main/homebrew/wolo.rb
 
 # Or add tap first
-brew tap mbos-agent/wolo
+brew tap lzjever/wolo
 brew install wolo
 
 # Upgrade
@@ -171,17 +171,17 @@ Completely isolated containerized installation.
 
 ```bash
 # Pull image
-docker pull ghcr.io/mbos-agent/wolo:latest
+docker pull ghcr.io/lzjever/wolo:latest
 
 # Run with mounted config and workspace
 docker run -it --rm \
   -v ~/.wolo:/root/.wolo \
   -v $(pwd):/workspace \
   -w /workspace \
-  ghcr.io/mbos-agent/wolo:latest "your prompt"
+  ghcr.io/lzjever/wolo:latest "your prompt"
 
 # Create an alias for convenience
-alias wolo='docker run -it --rm -v ~/.wolo:/root/.wolo -v $(pwd):/workspace -w /workspace ghcr.io/mbos-agent/wolo:latest'
+alias wolo='docker run -it --rm -v ~/.wolo:/root/.wolo -v $(pwd):/workspace -w /workspace ghcr.io/lzjever/wolo:latest'
 ```
 
 **Benefits**:
@@ -195,7 +195,7 @@ alias wolo='docker run -it --rm -v ~/.wolo:/root/.wolo -v $(pwd):/workspace -w /
 
 ```bash
 # Clone repository
-git clone https://github.com/mbos-agent/wolo.git
+git clone https://github.com/lzjever/wolo.git
 cd wolo
 
 # Using uv (recommended for development)

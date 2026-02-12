@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wolo One-Click Installation Script
 # Supports: Linux, macOS
-# Usage: curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.sh | bash
 
 set -e
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_URL="https://github.com/mbos-agent/wolo"
+REPO_URL="https://github.com/lzjever/wolo"
 INSTALL_METHOD="${WOLO_INSTALL_METHOD:-auto}" # auto, pip, uv, pyflow
 PYTHON_MIN_VERSION="3.10"
 PYTHON_MAX_VERSION="3.15"
@@ -228,9 +228,19 @@ install_from_source() {
 verify_installation() {
     log_info "Verifying installation..."
 
+    # Determine which Python to use for verification
+    VERIFY_PYTHON="$PYTHON_CMD"
+    if [ "$INSTALL_METHOD" = "uv" ]; then
+        # For uv method, use the venv Python
+        WOLO_VENV="${WOLO_HOME:-$HOME/.wolo}/venv"
+        if [ -f "$WOLO_VENV/bin/python" ]; then
+            VERIFY_PYTHON="$WOLO_VENV/bin/python"
+        fi
+    fi
+
     # Use full path or python -m
-    if $PYTHON_CMD -m wolo --version &> /dev/null; then
-        VERSION=$($PYTHON_CMD -m wolo --version 2>&1)
+    if "$VERIFY_PYTHON" -m wolo --version &> /dev/null; then
+        VERSION=$("$VERIFY_PYTHON" -m wolo --version 2>&1)
         log_success "wolo $VERSION is installed and working!"
     else
         log_error "Installation verification failed"
@@ -254,7 +264,7 @@ show_post_install() {
     echo ""
     echo "For more information:"
     echo "  GitHub: $REPO_URL"
-    echo "  Docs:   https://github.com/mbos-agent/wolo#readme"
+    echo "  Docs:   https://github.com/lzjever/wolo#readme"
     echo ""
 }
 

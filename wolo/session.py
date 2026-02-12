@@ -109,6 +109,9 @@ class Session:
     title: str | None = None
     tags: list[str] = field(default_factory=list)
     updated_at: float = field(default_factory=time.time)
+    # Actual token count from LLM responses (more accurate than estimation)
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
 
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
@@ -610,6 +613,8 @@ class SessionStorage:
         session.agent_type = metadata.get("agent_type")
         session.title = metadata.get("title")
         session.tags = metadata.get("tags", [])
+        session.total_input_tokens = metadata.get("total_input_tokens", 0)
+        session.total_output_tokens = metadata.get("total_output_tokens", 0)
         session.messages = self.get_all_messages(session_id)
 
         return session
@@ -632,6 +637,8 @@ class SessionStorage:
             "agent_type": session.agent_type,
             "title": session.title,
             "tags": session.tags,
+            "total_input_tokens": session.total_input_tokens,
+            "total_output_tokens": session.total_output_tokens,
             # Preserve fields from existing metadata
             "agent_display_name": existing_metadata.get("agent_display_name"),
             "pid": existing_metadata.get("pid"),
@@ -1294,6 +1301,67 @@ def add_session_tag(session_id: str, tag: str) -> None:
         session.tags.append(tag)
         session.updated_at = time.time()
         get_storage().update_session_metadata(session_id, tags=session.tags)
+
+
+def update_session_token_usage(session_id: str, input_tokens: int, output_tokens: int) -> None:
+    """Update session's cumulative token usage from LLM responses.
+
+    This tracks actual token counts from LLM API responses for more
+    accurate compaction decisions.
+
+    Args:
+        session_id: Session ID
+        input_tokens: Input tokens from last LLM call
+        output_tokens: Output tokens from last LLM call
+    """
+    session = get_session(session_id)
+    if session:
+        session.total_input_tokens += input_tokens
+        session.total_output_tokens += output_tokens
+        session.updated_at = time.time()
+        # Persist token counts to metadata
+        get_storage().update_session_metadata(
+            session_id,
+            total_input_tokens=session.total_input_tokens,
+            total_output_tokens=session.total_output_tokens,
+        )
+
+
+def get_session_token_usage(session_id: str) -> tuple[int, int]:
+    """Get session's cumulative token usage.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        Tuple of (total_input_tokens, total_output_tokens)
+    """
+    session = get_session(session_id)
+    if session:
+        return (session.total_input_tokens, session.total_output_tokens)
+    return (0, 0)
+
+
+def reset_session_token_usage(session_id: str) -> None:
+    """Reset session's cumulative token usage.
+
+    Called after compaction to ensure accurate token tracking
+    for subsequent compaction decisions.
+
+    Args:
+        session_id: Session ID
+    """
+    session = get_session(session_id)
+    if session:
+        session.total_input_tokens = 0
+        session.total_output_tokens = 0
+        session.updated_at = time.time()
+        # Persist reset to metadata
+        get_storage().update_session_metadata(
+            session_id,
+            total_input_tokens=0,
+            total_output_tokens=0,
+        )
 
 
 # ==================== Todos Persistence ====================

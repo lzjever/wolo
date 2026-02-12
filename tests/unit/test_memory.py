@@ -413,125 +413,6 @@ class TestMemoryTools:
         assert len(memories) == 1
         assert len(memories[0].content) < 20000
 
-    @pytest.mark.asyncio
-    async def test_memory_list_execute_empty(self):
-        """Test memory_list_execute with no memories."""
-        from wolo.tools_pkg.memory import memory_list_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-
-        result = await memory_list_execute(config=MockConfig())
-        assert "No memories found" in result["output"]
-        assert result["metadata"]["count"] == 0
-
-    @pytest.mark.asyncio
-    async def test_memory_list_execute_with_entries(self):
-        """Test memory_list_execute with memories."""
-        from wolo.tools_pkg.memory import memory_list_execute, memory_save_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-            ltm = None
-
-        await memory_save_execute(summary="First memory", tags=["tag1"], config=MockConfig())
-        await memory_save_execute(summary="Second memory", tags=["tag2"], config=MockConfig())
-
-        result = await memory_list_execute(config=MockConfig())
-        assert result["metadata"]["count"] == 2
-
-    @pytest.mark.asyncio
-    async def test_memory_list_execute_with_tag_filter(self):
-        """Test memory_list_execute with tag filter."""
-        from wolo.tools_pkg.memory import memory_list_execute, memory_save_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-            ltm = None
-
-        await memory_save_execute(summary="Python stuff", tags=["python"], config=MockConfig())
-        await memory_save_execute(summary="JS stuff", tags=["javascript"], config=MockConfig())
-
-        result = await memory_list_execute(tag_filter="python", config=MockConfig())
-        assert result["metadata"]["count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_memory_recall_execute(self):
-        """Test memory_recall_execute search."""
-        from wolo.tools_pkg.memory import memory_recall_execute, memory_save_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-            ltm = None
-
-        await memory_save_execute(
-            summary="How to debug Python async code",
-            tags=["python", "debug"],
-            config=MockConfig(),
-        )
-
-        result = await memory_recall_execute("debug", config=MockConfig())
-        assert result["metadata"]["count"] == 1
-        assert "debug" in result["output"].lower()
-
-    @pytest.mark.asyncio
-    async def test_memory_recall_by_exact_id(self):
-        """Test memory_recall_execute with exact ID match."""
-        from wolo.tools_pkg.memory import memory_recall_execute, memory_save_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-            ltm = None
-
-        save_result = await memory_save_execute(summary="Exact ID test", config=MockConfig())
-        memory_id = save_result["metadata"]["memory_id"]
-
-        result = await memory_recall_execute(memory_id, config=MockConfig())
-        assert result["metadata"]["count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_memory_recall_execute_no_results(self):
-        """Test memory_recall_execute with no matches."""
-        from wolo.tools_pkg.memory import memory_recall_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-
-        result = await memory_recall_execute("nonexistent", config=MockConfig())
-        assert "No memories found" in result["output"]
-        assert result["metadata"]["count"] == 0
-
-    @pytest.mark.asyncio
-    async def test_memory_delete_execute(self):
-        """Test memory_delete_execute."""
-        from wolo.tools_pkg.memory import memory_delete_execute, memory_save_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-            ltm = None
-
-        save_result = await memory_save_execute(summary="To delete", config=MockConfig())
-        memory_id = save_result["metadata"]["memory_id"]
-
-        result = await memory_delete_execute(memory_id, config=MockConfig())
-        assert "deleted" in result["output"].lower()
-        assert result["metadata"]["error"] is None
-
-        # Verify deleted
-        assert self.storage.get_memory(memory_id) is None
-
-    @pytest.mark.asyncio
-    async def test_memory_delete_execute_not_found(self):
-        """Test memory_delete_execute with non-existent ID."""
-        from wolo.tools_pkg.memory import memory_delete_execute
-
-        class MockConfig:
-            memories_dir = self.memories_dir
-
-        result = await memory_delete_execute("nonexistent_000000_000000", config=MockConfig())
-        assert "not found" in result["output"].lower()
-        assert result["metadata"]["error"] == "not_found"
-
 
 # ==================== Load Memories Tests ====================
 
@@ -641,15 +522,6 @@ class TestLoadMemories:
 class TestSlashCommands:
     """Tests for slash command handling."""
 
-    @pytest.fixture(autouse=True)
-    def setup_storage(self, tmp_path: Path, monkeypatch):
-        """Set up a temporary storage for each test."""
-        import wolo.memory.storage as storage_mod
-
-        test_storage = MemoryStorage(base_dir=tmp_path / "memories")
-        monkeypatch.setattr(storage_mod, "_storage", test_storage)
-        self.storage = test_storage
-
     @pytest.mark.asyncio
     async def test_remember_with_args(self):
         """Test /remember with arguments injects as user message."""
@@ -671,72 +543,9 @@ class TestSlashCommands:
         assert result.inject_as_user_message is None
 
     @pytest.mark.asyncio
-    async def test_recall(self):
-        """Test /recall command."""
-        from wolo.cli.slash import handle_slash_command
-        from wolo.tools_pkg.memory import memory_save_execute
-
-        await memory_save_execute(summary="Test recall content", tags=["test"])
-
-        result = await handle_slash_command("test_session", "/recall test")
-        assert result.handled is True
-        assert "Test recall content" in result.output
-
-    @pytest.mark.asyncio
-    async def test_recall_no_args(self):
-        """Test /recall without arguments shows usage."""
-        from wolo.cli.slash import handle_slash_command
-
-        result = await handle_slash_command("test_session", "/recall")
-        assert result.handled is True
-        assert "Usage" in result.output
-
-    @pytest.mark.asyncio
-    async def test_memories(self):
-        """Test /memories command."""
-        from wolo.cli.slash import handle_slash_command
-        from wolo.tools_pkg.memory import memory_save_execute
-
-        await memory_save_execute(summary="Listed memory", tags=["list"])
-
-        result = await handle_slash_command("test_session", "/memories")
-        assert result.handled is True
-        assert "Listed memory" in result.output
-
-    @pytest.mark.asyncio
-    async def test_forget(self):
-        """Test /forget command."""
-        from wolo.cli.slash import handle_slash_command
-        from wolo.tools_pkg.memory import memory_save_execute
-
-        save_result = await memory_save_execute(summary="Forget me")
-        memory_id = save_result["metadata"]["memory_id"]
-
-        result = await handle_slash_command("test_session", f"/forget {memory_id}")
-        assert result.handled is True
-        assert "deleted" in result.output.lower()
-
-    @pytest.mark.asyncio
-    async def test_forget_no_args(self):
-        """Test /forget without arguments shows usage."""
-        from wolo.cli.slash import handle_slash_command
-
-        result = await handle_slash_command("test_session", "/forget")
-        assert result.handled is True
-        assert "Usage" in result.output
-
-    @pytest.mark.asyncio
     async def test_unknown_slash_command(self):
         """Test unknown slash command returns not handled."""
         from wolo.cli.slash import handle_slash_command
 
         result = await handle_slash_command("test_session", "/unknown")
-        assert result.handled is False
-
-    @pytest.mark.asyncio
-    async def test_memory_command_not_handled(self):
-        """Test that /memory is not a valid command (use /remember instead)."""
-        from wolo.cli.slash import handle_slash_command
-
-        result = await handle_slash_command("test_session", "/memory something")
         assert result.handled is False

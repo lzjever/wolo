@@ -54,29 +54,29 @@ Created three one-click installation scripts for Wolo that enable users to insta
 ### Linux / macOS
 ```bash
 # Basic installation
-curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.sh | bash
 
 # With specific method
-WOLO_INSTALL_METHOD=uv bash <(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh)
+WOLO_INSTALL_METHOD=uv bash <(curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.sh)
 ```
 
 ### Windows
 ```powershell
 # Basic installation
-irm https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.ps1 | iex
 
 # Download and inspect first
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 -OutFile install.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.ps1 -OutFile install.ps1
 .\install.ps1
 ```
 
 ### Universal (Python)
 ```bash
 # Direct execution
-python3 -c "$(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
+python3 -c "$(curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.py)"
 
 # Download and run
-curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py
+curl -O https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.py
 python3 install.py --method uv
 ```
 
@@ -105,7 +105,7 @@ All scripts support inspection before execution:
 
 ```bash
 # Download and inspect
-curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh
+curl -O https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.sh
 less install.sh
 
 # Run after inspection

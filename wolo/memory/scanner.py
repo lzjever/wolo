@@ -15,7 +15,8 @@ class MemoryScanner:
     """Scans memories and formats them for LLM context injection.
 
     The scanner is called before each LLM call to inject relevant
-    memory context into the conversation.
+    memory context into the conversation. Results are cached based
+    on file modification times for efficiency.
     """
 
     MAX_MEMORY_CHARS = 50000  # Maximum total characters for memory context
@@ -28,17 +29,42 @@ class MemoryScanner:
         """
         self.storage = storage
         self._last_scan_count = 0
+        # Cache for formatted context string
+        self._cached_context: str | None = None
+        self._cache_dir_mtime: float = 0.0
+
+    def _get_dir_mtime(self) -> float:
+        """Get the most recent modification time in the memories directory.
+
+        Returns 0 if directory is empty or doesn't exist.
+        """
+        try:
+            mtimes = [p.stat().st_mtime for p in self.storage.base_dir.glob("*.md") if p.is_file()]
+            return max(mtimes) if mtimes else 0.0
+        except OSError:
+            return 0.0
 
     def scan_and_format(self) -> str | None:
         """Scan memories and format as LLM context string.
 
+        Uses caching to avoid re-formatting unchanged memory files.
+
         Returns:
             Formatted memory context string, or None if no memories
         """
+        # Check if cache is still valid
+        current_mtime = self._get_dir_mtime()
+        if self._cached_context is not None and current_mtime == self._cache_dir_mtime:
+            logger.debug("Memory context: using cached result")
+            return self._cached_context if self._cached_context else None
+
+        # Cache miss or invalidated - rebuild
         memories = self.storage.scan_memories()
         self._last_scan_count = len(memories)
 
         if not memories:
+            self._cached_context = None
+            self._cache_dir_mtime = current_mtime
             return None
 
         # Build context string
@@ -72,13 +98,17 @@ class MemoryScanner:
             included_count += 1
 
         if included_count == 0:
+            self._cached_context = None
+            self._cache_dir_mtime = current_mtime
             return None
 
         logger.debug(
-            f"Memory context: {included_count}/{len(memories)} memories, {total_chars} chars"
+            f"Memory context: {included_count}/{len(memories)} memories, {total_chars} chars (rebuilt)"
         )
 
-        return "\n".join(lines)
+        self._cached_context = "\n".join(lines)
+        self._cache_dir_mtime = current_mtime
+        return self._cached_context
 
     def _format_memory(self, memory) -> str:
         """Format a single memory for context."""
@@ -109,6 +139,15 @@ class MemoryScanner:
     def last_scan_count(self) -> int:
         """Number of memories found in last scan."""
         return self._last_scan_count
+
+    def invalidate_cache(self) -> None:
+        """Invalidate the formatted context cache.
+
+        Call this after creating/updating/deleting memories to ensure
+        the next scan_and_format() call rebuilds the context.
+        """
+        self._cached_context = None
+        self._cache_dir_mtime = 0.0
 
 
 # Global scanner instance

@@ -45,9 +45,9 @@ dependencies = [
 wolo = "wolo.cli:main_async"
 
 [project.urls]
-Homepage = "https://github.com/mbos-agent/wolo"
-Repository = "https://github.com/mbos-agent/wolo"
-Issues = "https://github.com/mbos-agent/wolo/issues"
+Homepage = "https://github.com/lzjever/wolo"
+Repository = "https://github.com/lzjever/wolo"
+Issues = "https://github.com/lzjever/wolo/issues"
 
 [tool.setuptools.packages.find]
 exclude = [

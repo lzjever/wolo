@@ -10,7 +10,7 @@ One-click installation script for Unix-like systems.
 
 **Usage:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.sh | bash
 ```
 
 **Features:**
@@ -30,7 +30,7 @@ PowerShell one-click installation script for Windows.
 
 **Usage:**
 ```powershell
-irm https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.ps1 | iex
 ```
 
 **Features:**
@@ -46,7 +46,7 @@ Python-based cross-platform installer.
 
 **Usage:**
 ```bash
-python3 -c "$(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
+python3 -c "$(curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.py)"
 python3 install.py --method uv
 python3 install.py --help
 ```

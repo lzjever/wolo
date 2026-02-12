@@ -4,7 +4,7 @@ Wolo Universal Installation Script
 Cross-platform installer that works on Linux, macOS, and Windows
 
 Usage:
-    curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py | python3 -
+    curl -sSL https://raw.githubusercontent.com/lzjever/wolo/main/scripts/install.py | python3 -
     python3 install.py [--method pip|uv|source]
 """
 
@@ -33,7 +33,7 @@ class Colors:
         return re.sub(r"\033\[[0-9;]+m", "", s)
 
 # Configuration
-REPO_URL = "https://github.com/mbos-agent/wolo"
+REPO_URL = "https://github.com/lzjever/wolo"
 PYPI_PACKAGE = "mbos-wolo"
 PYTHON_MIN_VERSION = (3, 10)
 PYTHON_MAX_VERSION = (3, 15)

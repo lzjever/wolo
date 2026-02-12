@@ -82,32 +82,36 @@ class CompactionConfig:
     )
 
 
-# Default summary prompt template
-DEFAULT_SUMMARY_PROMPT_TEMPLATE = """Please summarize the following conversation history to create a context summary for continuing the conversation.
+# Default summary prompt template (structured for consistent AI output)
+DEFAULT_SUMMARY_PROMPT_TEMPLATE = """Summarize the conversation history using this exact structure for context continuity.
 
-## Requirements
+## Goal
+[What the user is trying to accomplish - be specific about the main objective]
 
-1. **Include key information**:
-   - Tasks and operations that were completed
-   - Current work in progress
-   - Files and code being worked on
-   - Key decisions and their rationale
+## Completed
+[Work that has been finished successfully - list concrete achievements]
 
-2. **Maintain continuity**:
-   - The summary should enable seamless continuation of the conversation
-   - Preserve important technical details
-   - Note any pending tasks or TODOs
+## In Progress
+[Current work and pending tasks - what was being worked on when the summary was created]
 
-3. **Format**:
-   - Use concise Markdown format
-   - Organize information by topic
-   - Highlight critical information
+## Key Files
+[List of relevant files with brief notes about what they contain or their purpose]
+
+## Next Steps
+[What should be done next - recommended actions for continuing the work]
+
+## Important Context
+[Critical information for continuation - decisions made, constraints, preferences, or gotchas to remember]
+
+---
 
 ## Conversation History
 
 {conversation}
 
-## Please generate the summary
+---
+
+Generate the summary now, following the structure above exactly.
 """
 
 

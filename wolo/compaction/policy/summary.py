@@ -264,7 +264,11 @@ class SummaryCompactionPolicy(CompactionPolicy):
         prompt = template.format(conversation=conversation_text)
 
         # Call LLM
-        client = WoloLLMClient(self._llm_config, None, None)
+        from wolo.agents import COMPACTION_AGENT
+
+        client = WoloLLMClient(
+            self._llm_config, COMPACTION_AGENT, context.session_id, agent_display_name="compaction"
+        )
 
         try:
             llm_messages = [{"role": "user", "content": prompt}]

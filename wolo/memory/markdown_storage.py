@@ -42,7 +42,17 @@ class MarkdownMemoryStorage:
         """
         memories = []
 
-        for path in self.base_dir.glob("*.md"):
+        # Get all existing memory files
+        existing_paths = set(self.base_dir.glob("*.md"))
+
+        # Clean up cache entries for deleted files
+        cached_paths = set(self._cache.keys())
+        deleted_paths = cached_paths - existing_paths
+        for deleted_path in deleted_paths:
+            del self._cache[deleted_path]
+            logger.debug(f"Removed deleted file from cache: {deleted_path}")
+
+        for path in existing_paths:
             try:
                 # Check cache
                 mtime = path.stat().st_mtime

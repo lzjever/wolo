@@ -29,8 +29,10 @@ from wolo.session import (
     get_session_saver,
     has_pending_tool_calls,
     remove_session_saver,
+    reset_session_token_usage,
     to_llm_messages,
     update_message,
+    update_session_token_usage,
 )
 from wolo.tools import execute_tool, get_all_tools
 
@@ -312,6 +314,8 @@ async def _call_llm(
                     result = await compaction_manager.compact(messages, session_id)
                     if result.status == CompactionStatus.APPLIED:
                         messages_to_use = list(result.result_messages)
+                        # Reset token counter after compaction for accurate tracking
+                        reset_session_token_usage(session_id)
                         logger.info(
                             f"Compaction applied: saved {result.total_tokens_saved} tokens, "
                             f"policies: {[p.value for p in result.policies_applied]}"
@@ -595,6 +599,13 @@ async def agent_loop(
                 tool_duration_ms=pending_tool_duration_ms,
             )
             metrics.record_step(step_metrics)
+
+            # Update session's cumulative token usage for accurate compaction
+            update_session_token_usage(
+                session_id,
+                token_usage.get("prompt_tokens", 0),
+                token_usage.get("completion_tokens", 0),
+            )
 
             step += 1
 

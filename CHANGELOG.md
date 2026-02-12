@@ -5,22 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0] - 2026-02-10
+## [0.13.0] - 2026-02-13
 
 ### Added
 
-- **One-click installation scripts** for all platforms (Linux, macOS, Windows)
-  - `install.sh` - Bash installer for Unix-like systems
-  - `install.ps1` - PowerShell installer for Windows
-  - `install.py` - Universal Python-based installer
-- Multiple installation methods support (auto, uv, pip, source)
-- Comprehensive installation documentation (`docs/INSTALLATION.md`)
-- Installation script design documentation (`scripts/INSTALLATION_DESIGN.md`)
+- **Project-local configuration priority**: `.wolo/config.yaml` now takes precedence over `~/.wolo/config.yaml` for complete project isolation
+- **Session resume enhancement**: `-r/--resume` now creates a new session if the ID doesn't exist instead of erroring
+- **Markdown-based memory system**: Memories now stored as `.md` files with YAML frontmatter instead of JSON
+  - New `wolo/memory/markdown_model.py` - Markdown memory data model
+  - New `wolo/memory/markdown_storage.py` - Storage with mtime-based caching
+  - New `wolo/memory/scanner.py` - Memory scanner for LLM context injection
+  - New `wolo/memory/migrate.py` - JSON to Markdown migration tool
+- **Session ID security validation**: Prevents path traversal attacks in session IDs
+- **Security documentation**: Comprehensive `docs/SECURITY.md` documenting all security mechanisms
+- **E2E test suite**: 17 end-to-end tests covering file operations, shell commands, multi-step tasks, and session continuity
+- **Homebrew formula**: `homebrew/wolo.rb` for macOS native installation
+- **Universal installer**: Enhanced `install.sh` supporting uv/pipx/pip methods
 
 ### Changed
 
-- Updated README with one-click installation section
-- Installation methods now documented with examples
+- Memory context now automatically injected before each LLM call when LTM is enabled
+- Removed `memory_list`, `memory_recall`, `memory_delete` tools (users manage memories via filesystem)
+- Updated `docs/INSTALLATION.md` with comprehensive installation options
+- Sessions and memories now follow config directory (project `.wolo/` or home `~/.wolo/`)
+
+### Security
+
+- Added `SessionStorage._validate_session_id()` to prevent path traversal attacks
+- Added validation in all public session API functions (`load_session`, `delete_session`, etc.)
+- Memory file names sanitized via `_slugify()` to prevent path injection
+
+### Fixed
+
+- Code analysis e2e test now accepts 2 or 3 methods (LLM may count `__init__`)
 
 ## [0.3.0] - 2026-02-06
 

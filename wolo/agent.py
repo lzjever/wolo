@@ -328,6 +328,20 @@ async def _call_llm(
     if agent_config and agent_config.system_prompt:
         llm_messages.insert(0, {"role": "system", "content": agent_config.system_prompt})
 
+    # Inject memory context if LTM is enabled
+    if config.ltm.enabled:
+        from wolo.memory.scanner import get_scanner
+
+        scanner = get_scanner(config.memories_dir)
+        memory_context = scanner.scan_and_format()
+        if memory_context:
+            # Insert after system prompt if present, otherwise at beginning
+            if llm_messages and llm_messages[0].get("role") == "system":
+                llm_messages.insert(1, {"role": "user", "content": memory_context})
+            else:
+                llm_messages.insert(0, {"role": "user", "content": memory_context})
+            logger.debug(f"Injected memory context: {scanner.last_scan_count} memories")
+
     # Add max_steps warning if approaching limit
     is_last_step = step >= max_steps - 1
     if is_last_step:

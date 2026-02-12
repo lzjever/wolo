@@ -404,30 +404,6 @@ async def execute_tool(
             tool_part.output = result["output"]
             tool_part.status = "completed"
 
-        elif tool_part.tool == "memory_recall":
-            from wolo.tools_pkg.memory import memory_recall_execute
-
-            query = tool_part.input.get("query", "")
-            result = await memory_recall_execute(query)
-            tool_part.output = result["output"]
-            tool_part.status = "completed"
-
-        elif tool_part.tool == "memory_list":
-            from wolo.tools_pkg.memory import memory_list_execute
-
-            tag_filter = tool_part.input.get("tag_filter")
-            result = await memory_list_execute(tag_filter)
-            tool_part.output = result["output"]
-            tool_part.status = "completed"
-
-        elif tool_part.tool == "memory_delete":
-            from wolo.tools_pkg.memory import memory_delete_execute
-
-            memory_id = tool_part.input.get("memory_id", "")
-            result = await memory_delete_execute(memory_id)
-            tool_part.output = result["output"]
-            tool_part.status = "completed" if result["metadata"].get("error") is None else "error"
-
         elif tool_part.tool.startswith("mcp_"):
             # Handle MCP server tools
             from wolo.mcp_integration import call_mcp_tool

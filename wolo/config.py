@@ -134,21 +134,62 @@ class Config:
     # Compaction configuration (lazy import to avoid circular dependency)
     compaction: Any = None  # Type: CompactionConfig | None
 
+    # Source directory for config (project .wolo or home ~/.wolo)
+    config_source_dir: Path | None = None
+
+    @property
+    def sessions_dir(self) -> Path:
+        """Get sessions directory based on config source."""
+        return (self.config_source_dir or Path.home() / ".wolo") / "sessions"
+
+    @property
+    def memories_dir(self) -> Path:
+        """Get memories directory based on config source."""
+        return (self.config_source_dir or Path.home() / ".wolo") / "memories"
+
+    @classmethod
+    def _find_config_file(cls) -> tuple[Path | None, dict[str, Any]]:
+        """Find and load configuration file.
+
+        Priority:
+        1. {cwd}/.wolo/config.yaml (project local)
+        2. ~/.wolo/config.yaml (home directory)
+
+        Returns:
+            Tuple of (config_dir, config_data) where config_dir is the directory
+            containing the config file (or None if no config found)
+        """
+        # Check project local config first
+        project_config = Path.cwd() / ".wolo" / "config.yaml"
+        if project_config.exists():
+            try:
+                with open(project_config) as f:
+                    data = yaml.safe_load(f) or {}
+                return (Path.cwd() / ".wolo", data)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning(f"Failed to load project config: {e}")
+
+        # Fall back to home directory config
+        home_config = Path.home() / ".wolo" / "config.yaml"
+        if home_config.exists():
+            try:
+                with open(home_config) as f:
+                    data = yaml.safe_load(f) or {}
+                return (Path.home() / ".wolo", data)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning(f"Failed to load home config: {e}")
+
+        return (None, {})
+
     @classmethod
     def _load_config_file(cls) -> dict[str, Any]:
-        """Load configuration from ~/.wolo/config.yaml."""
-        config_path = Path.home() / ".wolo" / "config.yaml"
-        if not config_path.exists():
-            return {}
-
-        try:
-            with open(config_path) as f:
-                return yaml.safe_load(f) or {}
-        except Exception as e:
-            import logging
-
-            logging.getLogger(__name__).warning(f"Failed to load config file: {e}")
-            return {}
+        """Load configuration from ~/.wolo/config.yaml (legacy method)."""
+        _, config_data = cls._find_config_file()
+        return config_data
 
     @classmethod
     def is_first_run(cls) -> bool:
@@ -242,8 +283,9 @@ class Config:
             - If base_url is provided, all three (base_url, api_key, model) are required.
               This bypasses the config file completely.
             - Otherwise, uses endpoints from config file or environment variables.
+            - Project local config (.wolo/config.yaml) takes priority over home config.
         """
-        config_data = cls._load_config_file()
+        config_source_dir, config_data = cls._find_config_file()
 
         # Direct mode: if base_url is provided, bypass config file
         if base_url:
@@ -331,6 +373,7 @@ class Config:
                 mcp=mcp_config,
                 compaction=compaction_config,
                 path_safety=path_safety_config,
+                config_source_dir=config_source_dir,
             )
 
         # Config file mode: use endpoints from config file
@@ -463,4 +506,5 @@ class Config:
             mcp=mcp_config,
             compaction=compaction_config,
             path_safety=path_safety_config,
+            config_source_dir=config_source_dir,
         )

@@ -133,7 +133,7 @@ class TestSerializationEdgeCases(unittest.TestCase):
             id="t1",
             tool="shell",
             input={"command": 'echo "hello\nworld"'},
-            output='line1\nline2\ttab\x00null\u0000zero',
+            output="line1\nline2\ttab\x00null\u0000zero",
             status="completed",
         )
         serialized = _serialize_part(part)
@@ -276,7 +276,9 @@ class TestExecutorEdgeCases(unittest.IsolatedAsyncioTestCase):
             tool_part.output = "partial output before crash"
             raise RuntimeError("unexpected crash")
 
-        with patch("wolo.tools_pkg.executor.shell_execute", new_callable=AsyncMock, side_effect=fake_shell):
+        with patch(
+            "wolo.tools_pkg.executor.shell_execute", new_callable=AsyncMock, side_effect=fake_shell
+        ):
             with self.assertRaises(WoloToolError):
                 await execute_tool(tool_part)
 

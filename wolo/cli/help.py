@@ -70,7 +70,8 @@ BASIC USAGE:
 
 SESSION OPTIONS:
     -s, --session <name>    Create/use named session
-    -r, --resume <id>       Resume session (REPL mode by default)
+    -r, --resume <id>       Resume session, creates if not exists
+                            (REPL mode by default)
     -r, --resume <id> --solo "prompt"
                             Resume session (one-shot execution)
 
@@ -92,7 +93,7 @@ OTHER OPTIONS:
     -W, --wild              Wild mode: bypass safety checks and restrictions
 
     If --base-url is specified, all three (--base-url, --model, --api-key) are required.
-    Otherwise, Wolo uses endpoints from ~/.wolo/config.yaml
+    Otherwise, Wolo uses endpoints from config file.
 
 OUTPUT OPTIONS:
     --output-style <s>      Output style: minimal, default, verbose
@@ -107,6 +108,35 @@ DEBUG OPTIONS:
     --benchmark             Enable benchmark mode
     --benchmark-output <f>  Benchmark output file
 
+CONFIGURATION:
+    Wolo looks for config in this order:
+    1. .wolo/config.yaml in current directory (project-local)
+    2. ~/.wolo/config.yaml in home directory
+
+    When .wolo/ exists in the current directory, sessions and memories
+    are stored there instead of ~/.wolo/. This provides complete project
+    isolation.
+
+MEMORY SYSTEM:
+    Long-term memories are stored as markdown files in:
+    - .wolo/memories/ (if project config exists)
+    - ~/.wolo/memories/ (otherwise)
+
+    Memories are automatically loaded before each LLM call. Use the
+    memory_save tool to create new memories from conversations.
+
+    Memory file format (.md):
+    ```markdown
+    ---
+    title: Memory Title
+    tags: [tag1, tag2]
+    created_at: 2026-02-12T10:30:00
+    updated_at: 2026-02-12T10:30:00
+    source_session: AgentName_260212_103000
+    ---
+    # Memory content in markdown...
+    ```
+
 EXAMPLES:
     wolo "fix the bug in main.py"
     git diff | wolo "write commit message"
@@ -114,6 +144,7 @@ EXAMPLES:
     wolo --repl "let's explore the codebase"
     wolo -r mysession                        # Resume in REPL
     wolo -r mysession --solo "add tests"     # Resume one-shot
+    wolo -r new_session "start fresh"        # Creates new session
 
 SESSION MANAGEMENT:
     wolo session list               List sessions
@@ -144,7 +175,7 @@ USAGE:
 SUBCOMMANDS:
     list             List all sessions
     show <id>        Show session details (non-blocking)
-    resume <id>      Resume session in REPL mode (blocking)
+    resume <id>      Resume session in REPL mode (blocking, creates if not exists)
     create [name]    Create a new session
     watch <id>       Watch a running session (read-only)
     delete <id>      Delete a session
@@ -153,8 +184,8 @@ SUBCOMMANDS:
 QUICK OPTIONS:
     wolo -l                  Same as: wolo session list
     wolo -w <id>             Same as: wolo session watch <id>
-    wolo -r <id>             Resume session (REPL mode, default)
-    wolo -r <id> --solo "p"  Resume session (one-shot execution)
+    wolo -r <id>             Resume or create session (REPL mode)
+    wolo -r <id> --solo "p"  Resume or create session (one-shot)
 
 EXAMPLES:
     wolo session list
@@ -162,11 +193,13 @@ EXAMPLES:
     wolo session resume myproject           # Enter REPL
     wolo -r myproject                       # Same as above
     wolo -r myproject --solo "add tests"    # One-shot execution
+    wolo -r new_session "start fresh"       # Creates new session
     echo "task" | wolo -r myproject         # REPL with initial message
 
 NOTE:
     - 'session show' displays info and exits (non-blocking)
     - 'session resume' and '-r' both enter REPL mode by default
+    - '-r <id>' creates a new session if the ID doesn't exist
     - Use '-r <id> --solo "prompt"' for one-shot execution
 """
         print(help_text)
@@ -270,11 +303,14 @@ EXAMPLES:
 Resume a session in REPL mode for continued conversation.
 This is a blocking command that enters interactive REPL.
 
+If the session doesn't exist, it will be created automatically.
+
 If stdin has content (pipe), it becomes the first message.
 
 EXAMPLES:
     wolo session resume myproject              # Enter REPL
     wolo -r myproject                          # Same as above
+    wolo -r new_session "start fresh"          # Creates new session
     echo "task" | wolo -r myproject            # REPL with initial msg
 
 FOR ONE-SHOT EXECUTION:

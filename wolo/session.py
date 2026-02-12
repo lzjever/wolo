@@ -267,6 +267,31 @@ class SessionStorage:
 
     # ==================== Session Operations ====================
 
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        """Validate session_id to prevent path traversal attacks.
+
+        Args:
+            session_id: Session ID to validate
+
+        Raises:
+            ValueError: If session_id contains invalid characters
+        """
+        if not session_id:
+            raise ValueError("session_id cannot be empty")
+
+        # 禁止路径分隔符和路径遍历字符
+        forbidden_chars = ["/", "\\", ".."]
+        for char in forbidden_chars:
+            if char in session_id:
+                raise ValueError(
+                    f"Invalid session_id '{session_id}': contains forbidden character '{char}'"
+                )
+
+        # 禁止以点开头（隐藏文件）
+        if session_id.startswith("."):
+            raise ValueError(f"Invalid session_id '{session_id}': cannot start with '.'")
+
     def create_session(
         self,
         session_id: str | None = None,
@@ -285,7 +310,7 @@ class SessionStorage:
             session_id 字符串
 
         Raises:
-            ValueError: 如果指定的 session_id 已存在
+            ValueError: 如果指定的 session_id 已存在或包含非法字符
         """
         # Track if session_id was user-provided (for retry logic)
         user_provided_id = session_id is not None
@@ -298,6 +323,9 @@ class SessionStorage:
 
                 agent_name = get_random_agent_name()
             session_id = _generate_session_id(agent_name)
+        else:
+            # 验证用户提供的 session_id
+            self._validate_session_id(session_id)
 
         # 检查 session_id 是否已存在
         # 对于用户提供的ID，直接报错；对于自动生成的ID，带重试机制
@@ -737,6 +765,19 @@ def set_storage(storage: SessionStorage) -> None:
     _storage = storage
 
 
+def set_storage_base_dir(base_dir: Path) -> None:
+    """Set the base directory for session storage.
+
+    This creates a new storage instance with the given base directory.
+    Used to switch between project-local and home directory storage.
+
+    Args:
+        base_dir: Base directory for session storage (e.g., .wolo/sessions)
+    """
+    global _storage
+    _storage = SessionStorage(base_dir=base_dir)
+
+
 # ==================== In-Memory Cache ====================
 
 _sessions: dict[str, Session] = {}
@@ -1100,6 +1141,9 @@ def save_session(session_id: str, sessions_dir: Path | None = None) -> None:
 
 def load_session(session_id: str, sessions_dir: Path | None = None) -> Session:
     """Load a session from disk."""
+    # Validate session_id to prevent path traversal
+    SessionStorage._validate_session_id(session_id)
+
     storage = get_storage()
 
     # Check new format first
@@ -1155,24 +1199,36 @@ def check_and_set_session_pid(session_id: str) -> bool:
     Returns:
         True 如果成功，False 如果有运行中的进程
     """
+    # Validate session_id to prevent path traversal
+    SessionStorage._validate_session_id(session_id)
+
     storage = get_storage()
     return storage.check_and_set_pid(session_id)
 
 
 def clear_session_pid(session_id: str) -> None:
     """清除 session PID（公共 API）。"""
+    # Validate session_id to prevent path traversal
+    SessionStorage._validate_session_id(session_id)
+
     storage = get_storage()
     storage.clear_pid(session_id)
 
 
 def get_session_status(session_id: str) -> dict:
     """获取 session 状态（公共 API）。"""
+    # Validate session_id to prevent path traversal
+    SessionStorage._validate_session_id(session_id)
+
     storage = get_storage()
     return storage.get_session_status(session_id)
 
 
 def delete_session(session_id: str, sessions_dir: Path | None = None) -> bool:
     """Delete a session from disk."""
+    # Validate session_id to prevent path traversal
+    SessionStorage._validate_session_id(session_id)
+
     storage = get_storage()
 
     # Try new format

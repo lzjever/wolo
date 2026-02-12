@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from wolo.memory.markdown_storage import MarkdownMemoryStorage
 from wolo.memory.model import Memory, _slugify
 from wolo.memory.storage import MemoryStorage
 
@@ -362,41 +363,53 @@ class TestMemoryTools:
     @pytest.fixture(autouse=True)
     def setup_storage(self, tmp_path: Path, monkeypatch):
         """Set up a temporary storage for each test."""
-        import wolo.memory.storage as storage_mod
+        import wolo.memory.markdown_storage as storage_mod
 
-        test_storage = MemoryStorage(base_dir=tmp_path / "memories")
+        test_storage = MarkdownMemoryStorage(base_dir=tmp_path / "memories")
         monkeypatch.setattr(storage_mod, "_storage", test_storage)
         self.storage = test_storage
+        self.memories_dir = tmp_path / "memories"
 
     @pytest.mark.asyncio
     async def test_memory_save_execute(self):
         """Test memory_save_execute without LLM (direct save)."""
         from wolo.tools_pkg.memory import memory_save_execute
 
+        # Create a mock config with memories_dir
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
+
         result = await memory_save_execute(
             summary="Test knowledge about Python async",
             tags=["python", "async"],
+            config=MockConfig(),
         )
         assert "Memory saved" in result["output"]
         assert "python" in result["metadata"]["tags"]
 
         # Verify stored
-        memories = self.storage.list_all()
+        memories = self.storage.scan_memories()
         assert len(memories) == 1
-        assert memories[0].title == "Test knowledge about Python async"[:50]
+        assert memories[0].title == "Test knowledge about Python async"
 
     @pytest.mark.asyncio
     async def test_memory_save_with_truncation(self):
         """Test memory_save_execute truncates large content."""
         from wolo.tools_pkg.memory import memory_save_execute
 
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
+
         result = await memory_save_execute(
             summary="x" * 20000,
             max_content_size=100,
+            config=MockConfig(),
         )
         assert "Memory saved" in result["output"]
 
-        memories = self.storage.list_all()
+        memories = self.storage.scan_memories()
         assert len(memories) == 1
         assert len(memories[0].content) < 20000
 
@@ -405,7 +418,10 @@ class TestMemoryTools:
         """Test memory_list_execute with no memories."""
         from wolo.tools_pkg.memory import memory_list_execute
 
-        result = await memory_list_execute()
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        result = await memory_list_execute(config=MockConfig())
         assert "No memories found" in result["output"]
         assert result["metadata"]["count"] == 0
 
@@ -414,10 +430,14 @@ class TestMemoryTools:
         """Test memory_list_execute with memories."""
         from wolo.tools_pkg.memory import memory_list_execute, memory_save_execute
 
-        await memory_save_execute(summary="First memory", tags=["tag1"])
-        await memory_save_execute(summary="Second memory", tags=["tag2"])
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
 
-        result = await memory_list_execute()
+        await memory_save_execute(summary="First memory", tags=["tag1"], config=MockConfig())
+        await memory_save_execute(summary="Second memory", tags=["tag2"], config=MockConfig())
+
+        result = await memory_list_execute(config=MockConfig())
         assert result["metadata"]["count"] == 2
 
     @pytest.mark.asyncio
@@ -425,10 +445,14 @@ class TestMemoryTools:
         """Test memory_list_execute with tag filter."""
         from wolo.tools_pkg.memory import memory_list_execute, memory_save_execute
 
-        await memory_save_execute(summary="Python stuff", tags=["python"])
-        await memory_save_execute(summary="JS stuff", tags=["javascript"])
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
 
-        result = await memory_list_execute(tag_filter="python")
+        await memory_save_execute(summary="Python stuff", tags=["python"], config=MockConfig())
+        await memory_save_execute(summary="JS stuff", tags=["javascript"], config=MockConfig())
+
+        result = await memory_list_execute(tag_filter="python", config=MockConfig())
         assert result["metadata"]["count"] == 1
 
     @pytest.mark.asyncio
@@ -436,12 +460,17 @@ class TestMemoryTools:
         """Test memory_recall_execute search."""
         from wolo.tools_pkg.memory import memory_recall_execute, memory_save_execute
 
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
+
         await memory_save_execute(
             summary="How to debug Python async code",
             tags=["python", "debug"],
+            config=MockConfig(),
         )
 
-        result = await memory_recall_execute("debug")
+        result = await memory_recall_execute("debug", config=MockConfig())
         assert result["metadata"]["count"] == 1
         assert "debug" in result["output"].lower()
 
@@ -450,10 +479,14 @@ class TestMemoryTools:
         """Test memory_recall_execute with exact ID match."""
         from wolo.tools_pkg.memory import memory_recall_execute, memory_save_execute
 
-        save_result = await memory_save_execute(summary="Exact ID test")
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
+
+        save_result = await memory_save_execute(summary="Exact ID test", config=MockConfig())
         memory_id = save_result["metadata"]["memory_id"]
 
-        result = await memory_recall_execute(memory_id)
+        result = await memory_recall_execute(memory_id, config=MockConfig())
         assert result["metadata"]["count"] == 1
 
     @pytest.mark.asyncio
@@ -461,7 +494,10 @@ class TestMemoryTools:
         """Test memory_recall_execute with no matches."""
         from wolo.tools_pkg.memory import memory_recall_execute
 
-        result = await memory_recall_execute("nonexistent")
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        result = await memory_recall_execute("nonexistent", config=MockConfig())
         assert "No memories found" in result["output"]
         assert result["metadata"]["count"] == 0
 
@@ -470,22 +506,29 @@ class TestMemoryTools:
         """Test memory_delete_execute."""
         from wolo.tools_pkg.memory import memory_delete_execute, memory_save_execute
 
-        save_result = await memory_save_execute(summary="To delete")
+        class MockConfig:
+            memories_dir = self.memories_dir
+            ltm = None
+
+        save_result = await memory_save_execute(summary="To delete", config=MockConfig())
         memory_id = save_result["metadata"]["memory_id"]
 
-        result = await memory_delete_execute(memory_id)
+        result = await memory_delete_execute(memory_id, config=MockConfig())
         assert "deleted" in result["output"].lower()
         assert result["metadata"]["error"] is None
 
         # Verify deleted
-        assert self.storage.load(memory_id) is None
+        assert self.storage.get_memory(memory_id) is None
 
     @pytest.mark.asyncio
     async def test_memory_delete_execute_not_found(self):
         """Test memory_delete_execute with non-existent ID."""
         from wolo.tools_pkg.memory import memory_delete_execute
 
-        result = await memory_delete_execute("nonexistent_000000_000000")
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        result = await memory_delete_execute("nonexistent_000000_000000", config=MockConfig())
         assert "not found" in result["output"].lower()
         assert result["metadata"]["error"] == "not_found"
 
@@ -499,20 +542,23 @@ class TestLoadMemories:
     @pytest.fixture(autouse=True)
     def setup_storage(self, tmp_path: Path, monkeypatch):
         """Set up a temporary storage for each test."""
-        import wolo.memory.storage as storage_mod
+        import wolo.memory.markdown_storage as storage_mod
 
-        test_storage = MemoryStorage(base_dir=tmp_path / "memories")
+        test_storage = MarkdownMemoryStorage(base_dir=tmp_path / "memories")
         monkeypatch.setattr(storage_mod, "_storage", test_storage)
         self.storage = test_storage
+        self.memories_dir = tmp_path / "memories"
 
     def test_load_by_exact_id(self):
         """Test loading a memory by exact ID."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        mem = Memory.create(title="Test Load", summary="S", content="Load content", tags=["test"])
-        self.storage.save(mem)
+        class MockConfig:
+            memories_dir = self.memories_dir
 
-        result = load_memories_for_session([mem.id])
+        mem = self.storage.create_memory(title="Test Load", content="Load content", tags=["test"])
+
+        result = load_memories_for_session([mem.id], config=MockConfig())
         assert result is not None
         assert "Load content" in result
         assert "Test Load" in result
@@ -521,14 +567,15 @@ class TestLoadMemories:
         """Test loading memories by search query."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        mem = Memory.create(
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        self.storage.create_memory(
             title="Python Async",
-            summary="How to use async",
             content="Async details here",
         )
-        self.storage.save(mem)
 
-        result = load_memories_for_session(["python"])
+        result = load_memories_for_session(["python"], config=MockConfig())
         assert result is not None
         assert "Async details here" in result
 
@@ -536,12 +583,13 @@ class TestLoadMemories:
         """Test loading multiple memories."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        mem1 = Memory.create(title="Alpha", summary="S1", content="Content A", tags=["a"])
-        mem2 = Memory.create(title="Beta", summary="S2", content="Content B", tags=["b"])
-        self.storage.save(mem1)
-        self.storage.save(mem2)
+        class MockConfig:
+            memories_dir = self.memories_dir
 
-        result = load_memories_for_session([mem1.id, mem2.id])
+        mem1 = self.storage.create_memory(title="Alpha", content="Content A", tags=["a"])
+        mem2 = self.storage.create_memory(title="Beta", content="Content B", tags=["b"])
+
+        result = load_memories_for_session([mem1.id, mem2.id], config=MockConfig())
         assert result is not None
         assert "Content A" in result
         assert "Content B" in result
@@ -550,11 +598,13 @@ class TestLoadMemories:
         """Test that duplicate memories are deduplicated."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        mem = Memory.create(title="Dedup", summary="S", content="Unique content")
-        self.storage.save(mem)
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        mem = self.storage.create_memory(title="Dedup", content="Unique content")
 
         # Load same memory twice via ID and search
-        result = load_memories_for_session([mem.id, "dedup"])
+        result = load_memories_for_session([mem.id, "dedup"], config=MockConfig())
         assert result is not None
         # Should only appear once
         assert result.count("Unique content") == 1
@@ -563,17 +613,22 @@ class TestLoadMemories:
         """Test loading when no memories match."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        result = load_memories_for_session(["nonexistent"])
+        class MockConfig:
+            memories_dir = self.memories_dir
+
+        result = load_memories_for_session(["nonexistent"], config=MockConfig())
         assert result is None
 
     def test_load_format(self):
         """Test the format of loaded memories context."""
         from wolo.tools_pkg.memory import load_memories_for_session
 
-        mem = Memory.create(title="Format Test", summary="S", content="Body", tags=["tag1"])
-        self.storage.save(mem)
+        class MockConfig:
+            memories_dir = self.memories_dir
 
-        result = load_memories_for_session([mem.id])
+        mem = self.storage.create_memory(title="Format Test", content="Body", tags=["tag1"])
+
+        result = load_memories_for_session([mem.id], config=MockConfig())
         assert "[Loaded memories]" in result
         assert "[End of loaded memories]" in result
         assert "Format Test" in result

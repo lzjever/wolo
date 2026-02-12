@@ -4,12 +4,29 @@ This document describes the various ways to install Wolo, including one-click in
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [One-Click Installation](#one-click-installation)
 - [Installation Methods](#installation-methods)
 - [Manual Installation](#manual-installation)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
 - [Uninstallation](#uninstallation)
+
+## Quick Start
+
+```bash
+# Recommended: One-click install
+curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+
+# Or: Using uv tool (fastest)
+uv tool install mbos-wolo
+
+# Or: Using pipx (official Python way)
+pipx install mbos-wolo
+
+# Or (macOS): Using Homebrew
+brew install --formula https://raw.githubusercontent.com/mbos-agent/wolo/main/homebrew/wolo.rb
+```
 
 ## One-Click Installation
 
@@ -19,19 +36,22 @@ Wolo provides platform-specific one-click installation scripts that handle all d
 
 The shell script installer (`install.sh`) supports:
 - Automatic Python detection
-- Installation via `uv` (fast) or `pip` (fallback)
+- Installation via `uv` (recommended), `pipx`, or `pip` (fallback)
 - User or system-wide installation
 - PATH configuration
 
 ```bash
-# Basic installation
-curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh | bash
+# Basic installation (uses uv by default)
+curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
+
+# Using wget
+wget -qO- https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
 
 # With specific installation method
-WOLO_INSTALL_METHOD=uv bash <(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh)
+METHOD=pipx curl -fsSL https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh | bash
 
 # Download and inspect first
-curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.sh
+curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/install.sh
 less install.sh
 bash install.sh
 ```
@@ -54,96 +74,122 @@ Get-Content install.ps1
 .\install.ps1
 ```
 
-### Universal Python Installer
-
-The Python installer (`install.py`) works on all platforms and provides:
-- Cross-platform compatibility
-- Command-line argument support
-- Detailed error messages
-
-```bash
-# Using curl
-python3 -c "$(curl -sSL https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
-
-# Using wget
-python3 -c "$(wget -qO- https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py)"
-
-# Download and run
-curl -O https://raw.githubusercontent.com/mbos-agent/wolo/main/scripts/install.py
-python3 install.py --method uv
-```
-
 ## Installation Methods
 
-### Auto (Default)
+### 1. uv tool (Recommended)
 
-Automatically selects the best available method:
-1. Checks if `uv` is installed
-2. Falls back to `pip` if not available
+The fastest and most modern Python package manager.
 
 ```bash
-WOLO_INSTALL_METHOD=auto bash install.sh
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install wolo
+uv tool install mbos-wolo
+
+# Upgrade
+uv tool upgrade mbos-wolo
+
+# Uninstall
+uv tool uninstall mbos-wolo
 ```
 
-### UV Method
-
-Uses the `uv` package manager for fast installation:
-
-```bash
-# Install via installer
-WOLO_INSTALL_METHOD=uv bash install.sh
-
-# Or manually
-uv pip install mbos-wolo
-```
-
-Benefits:
+**Benefits**:
 - 10-100x faster than pip
-- Creates isolated virtual environment
-- Better dependency resolution
+- Creates isolated environment automatically
+- Best dependency resolution
+- Easy upgrade/downgrade
 
-### PIP Method
+### 2. pipx (Official Python CLI installer)
 
-Standard pip installation:
+Python's official recommendation for installing CLI tools.
 
 ```bash
-# Install via installer
-WOLO_INSTALL_METHOD=pip bash install.sh
+# Install pipx if not already installed
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
 
-# Or manually
-pip install mbos-wolo
+# Install wolo
+pipx install mbos-wolo
 
-# User install (no sudo required)
+# Upgrade
+pipx upgrade mbos-wolo
+
+# Uninstall
+pipx uninstall mbos-wolo
+```
+
+**Benefits**:
+- Official Python recommendation
+- Each tool in isolated virtualenv
+- Stable and well-tested
+
+### 3. Homebrew (macOS only)
+
+Native macOS package manager experience.
+
+```bash
+# Install from formula URL
+brew install --formula https://raw.githubusercontent.com/mbos-agent/wolo/main/homebrew/wolo.rb
+
+# Or add tap first
+brew tap mbos-agent/wolo
+brew install wolo
+
+# Upgrade
+brew upgrade wolo
+
+# Uninstall
+brew uninstall wolo
+```
+
+**Benefits**:
+- Native macOS experience
+- Automatic dependency management
+- Easy updates via `brew upgrade`
+
+### 4. pip (Fallback)
+
+Standard pip installation.
+
+```bash
+# User install (recommended, no sudo)
 pip install --user mbos-wolo
-```
 
-### Source Method
-
-Installs directly from the git repository:
-
-```bash
-WOLO_INSTALL_METHOD=source bash install.sh
-```
-
-This method:
-- Clones the repository
-- builds the package
-- Installs the wheel
-
-## Manual Installation
-
-### From PyPI
-
-```bash
-# Using uv
-uv pip install mbos-wolo
-
-# Using pip
+# Or into a virtual environment
+python3 -m venv ~/.venv/wolo
+source ~/.venv/wolo/bin/activate
 pip install mbos-wolo
 
 # Upgrade
 pip install --upgrade mbos-wolo
 ```
+
+### 5. Docker
+
+Completely isolated containerized installation.
+
+```bash
+# Pull image
+docker pull ghcr.io/mbos-agent/wolo:latest
+
+# Run with mounted config and workspace
+docker run -it --rm \
+  -v ~/.wolo:/root/.wolo \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  ghcr.io/mbos-agent/wolo:latest "your prompt"
+
+# Create an alias for convenience
+alias wolo='docker run -it --rm -v ~/.wolo:/root/.wolo -v $(pwd):/workspace -w /workspace ghcr.io/mbos-agent/wolo:latest'
+```
+
+**Benefits**:
+- Complete isolation
+- No Python installation needed
+- Consistent across all platforms
+
+## Manual Installation
 
 ### From Source
 
@@ -152,14 +198,14 @@ pip install --upgrade mbos-wolo
 git clone https://github.com/mbos-agent/wolo.git
 cd wolo
 
-# Using uv (recommended)
-uv sync
+# Using uv (recommended for development)
+uv sync --group dev --all-extras
 
-# Using pip
-pip install -e .
+# Run in development mode
+uv run wolo "your prompt"
 
-# With development dependencies
-pip install -e ".[dev]"
+# Or install editable
+uv pip install -e .
 ```
 
 ### Using Makefile
@@ -183,14 +229,33 @@ wolo --version
 # Or using python module
 python -m wolo --version
 
+# View help
+wolo --help
+
 # Run a simple task
-wolo "echo hello world"
+wolo "say hello"
 ```
 
-Expected output:
-```
-[INFO] Wolo vX.Y.Z
-...
+## Post-Installation Configuration
+
+```bash
+# Create config directory
+mkdir -p ~/.wolo
+
+# Create config file
+cat > ~/.wolo/config.yaml << 'EOF'
+endpoints:
+  - name: default
+    model: gpt-4o
+    api_base: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}  # Use env var for security
+EOF
+
+# Set API key
+export OPENAI_API_KEY="your-api-key"
+
+# Verify configuration
+wolo config show
 ```
 
 ## Troubleshooting
@@ -208,120 +273,88 @@ Expected output:
 
 **Error**: `wolo: command not found`
 
-**Solution**: The installation directory is not in your PATH. Add it:
+**Solution**: The installation directory is not in your PATH:
 
-**Linux / macOS**:
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
 export PATH="$HOME/.local/bin:$PATH"
 
-# Or use python module directly
-python -m wolo "your prompt"
-```
+# Reload shell
+source ~/.bashrc  # or source ~/.zshrc
 
-**Windows**:
-```powershell
-# Add to user PATH
-$env:Path += ";$env:USERPROFILE\bin"
-
-# Or use python module directly
-python -m wolo "your prompt"
+# Verify
+which wolo
 ```
 
 ### Permission Denied
 
-**Error**: `Permission denied` when running install script
+**Error**: `Permission denied`
 
-**Solution**: Make the script executable:
+**Solution**: Use user install instead of system install:
 ```bash
-chmod +x install.sh
-./install.sh
+pip install --user mbos-wolo
+# or
+uv tool install mbos-wolo
 ```
 
-### UV Installation Fails
+### uv Installation Fails
 
 **Error**: UV installation fails
 
-**Solution**: Use pip instead:
+**Solution**: Use pipx instead:
 ```bash
-WOLO_INSTALL_METHOD=pip bash install.sh
-```
-
-### Virtual Environment Issues
-
-**Error**: Virtual environment creation fails
-
-**Solution**: Ensure python-venv is installed:
-```bash
-# Debian/Ubuntu
-sudo apt install python3-venv
-
-# Fedora
-sudo dnf install python3-virtualenv
-
-# macOS (using Homebrew)
-brew install python-tk@3.12
+python3 -m pip install --user pipx
+pipx install mbos-wolo
 ```
 
 ## Uninstallation
 
-### Remove Package
-
 ```bash
-# If installed via pip
+# uv tool
+uv tool uninstall mbos-wolo
+
+# pipx
+pipx uninstall mbos-wolo
+
+# Homebrew
+brew uninstall wolo
+
+# pip
 pip uninstall mbos-wolo
 
-# If installed via uv
-uv pip uninstall mbos-wolo
-```
-
-### Remove Configuration
-
-```bash
-# Remove config directory
+# Remove config and data (optional)
 rm -rf ~/.wolo
-
-# Remove wrapper scripts
-rm -f ~/.local/bin/wolo  # Linux/macOS
-rm -f ~/bin/wolo.bat     # Windows
-```
-
-### Clean Virtual Environment (UV Installation)
-
-```bash
-# Remove wolo virtual environment
-rm -rf ~/.wolo/venv
 ```
 
 ## Environment Variables
 
-The installation scripts respect the following environment variables:
-
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `WOLO_INSTALL_METHOD` | Installation method (auto, uv, pip, source) | `auto` |
-| `WOLO_HOME` | Installation directory | `~/.wolo` |
 | `WOLO_API_KEY` | API key for LLM backend | - |
 | `WOLO_MODEL` | Default model to use | - |
-| `WOLO_API_BASE` | API base URL | - |
+| `WOLO_BASE_URL` | API base URL | - |
+| `WOLO_WILD_MODE` | Enable wild mode | `0` |
 
-## Post-Installation
+## Project-Local Configuration
 
-After installation, configure Wolo:
+For project isolation, create `.wolo/config.yaml` in your project directory:
 
 ```bash
-# Initialize configuration
-wolo config init
+mkdir -p myproject/.wolo
+cat > myproject/.wolo/config.yaml << 'EOF'
+endpoints:
+  - name: default
+    model: claude-3-opus
+    api_base: https://api.anthropic.com/v1
+    api_key: ${ANTHROPIC_API_KEY}
+EOF
 
-# Set API key
-export WOLO_API_KEY="your-api-key-here"
-
-# Verify configuration
-wolo config show
+cd myproject
+wolo "your prompt"  # Uses project config
 ```
 
 ## Next Steps
 
+- [Security Guide](SECURITY.md)
 - [Configuration Guide](CONFIGURATION.md)
-- [User Guide](USER_GUIDE.md)
 - [Development Guide](DEVELOPMENT.md)

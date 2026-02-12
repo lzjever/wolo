@@ -124,9 +124,7 @@ class TestN01bHandlePendingToolsCatch(unittest.IsolatedAsyncioTestCase):
         config = MagicMock()
         config.path_safety = MagicMock()
         config.path_safety.wild_mode = False
-        agent_config = AgentConfig(
-            name="test", description="", permissions=[], system_prompt=""
-        )
+        agent_config = AgentConfig(name="test", description="", permissions=[], system_prompt="")
 
         should_cont, user_input, step, dur = await _handle_pending_tools(
             msg, None, None, agent_config, "s1", config, 1, "Test"
@@ -150,21 +148,15 @@ class TestN01bHandlePendingToolsCatch(unittest.IsolatedAsyncioTestCase):
         msg.parts = [tool_part]
         msg.finished = False
 
-        mock_exec.side_effect = WoloPathSafetyError(
-            "cancelled", session_id="s1", path="/foo"
-        )
+        mock_exec.side_effect = WoloPathSafetyError("cancelled", session_id="s1", path="/foo")
 
         config = MagicMock()
         config.path_safety = MagicMock()
         config.path_safety.wild_mode = False
-        agent_config = AgentConfig(
-            name="test", description="", permissions=[], system_prompt=""
-        )
+        agent_config = AgentConfig(name="test", description="", permissions=[], system_prompt="")
 
         with self.assertRaises(WoloPathSafetyError):
-            await _handle_pending_tools(
-                msg, None, None, agent_config, "s1", config, 1, "Test"
-            )
+            await _handle_pending_tools(msg, None, None, agent_config, "s1", config, 1, "Test")
 
 
 # ==================== N02: to_llm_messages handles interrupted tools ====================
@@ -217,9 +209,7 @@ class TestN02InterruptedTools(unittest.TestCase):
 
         result = to_llm_messages([msg])
         self.assertEqual(len(result), 2)
-        self.assertEqual(
-            result[1]["content"], "[Tool execution interrupted by user]"
-        )
+        self.assertEqual(result[1]["content"], "[Tool execution interrupted by user]")
 
 
 # ==================== N03: batch tool passes agent_config ====================

@@ -114,6 +114,11 @@ class RunCommand(BaseCommand):
                 base_url=args.execution_options.base_url,
                 model=args.execution_options.model,
             )
+            # Set session storage to use config's sessions_dir (project-local or home)
+            from wolo.session import set_storage_base_dir
+
+            set_storage_base_dir(config.sessions_dir)
+
             solo_mode = args.execution_options.mode == ExecutionMode.SOLO
             if solo_mode and not args.execution_options.wild_mode_explicit:
                 config.path_safety.wild_mode = True
@@ -154,38 +159,44 @@ class RunCommand(BaseCommand):
 
         # Create or resume session
         if args.session_options.resume_id:
-            # Resume existing session
+            # Resume or create session
             resume_id = args.session_options.resume_id
             status = get_session_status(resume_id)
             if not status.get("exists"):
-                print(f"Error: Session not found: {resume_id}", file=sys.stderr)
-                return ExitCode.SESSION_ERROR
+                # Session doesn't exist - create new session with the given ID
+                workdir = args.execution_options.workdir
+                session_id = create_session(session_id=resume_id, workdir=workdir)
+                check_and_set_session_pid(session_id)
+            else:
+                # Session exists - check if running and load it
+                if status.get("is_running"):
+                    pid = status.get("pid")
+                    print(
+                        f"Error: Session '{resume_id}' is already running (PID: {pid})",
+                        file=sys.stderr,
+                    )
+                    print(f"       Use 'wolo -w {resume_id}' to watch it.", file=sys.stderr)
+                    return ExitCode.SESSION_ERROR
 
-            if status.get("is_running"):
-                pid = status.get("pid")
-                print(
-                    f"Error: Session '{resume_id}' is already running (PID: {pid})", file=sys.stderr
-                )
-                print(f"       Use 'wolo -w {resume_id}' to watch it.", file=sys.stderr)
-                return ExitCode.SESSION_ERROR
+                if not check_and_set_session_pid(resume_id):
+                    print(
+                        f"Error: Failed to acquire session lock for: {resume_id}", file=sys.stderr
+                    )
+                    return ExitCode.SESSION_ERROR
 
-            if not check_and_set_session_pid(resume_id):
-                print(f"Error: Failed to acquire session lock for: {resume_id}", file=sys.stderr)
-                return ExitCode.SESSION_ERROR
+                try:
+                    load_session(resume_id)
+                    session_id = resume_id
+                except (FileNotFoundError, ValueError) as e:
+                    print(f"Error: {e}", file=sys.stderr)
+                    return ExitCode.SESSION_ERROR
 
-            try:
-                load_session(resume_id)
-                session_id = resume_id
-            except (FileNotFoundError, ValueError) as e:
-                print(f"Error: {e}", file=sys.stderr)
-                return ExitCode.SESSION_ERROR
+                # Check workdir match (warning only, don't block)
+                from wolo.cli.utils import check_workdir_match, print_workdir_warning
 
-            # Check workdir match (warning only, don't block)
-            from wolo.cli.utils import check_workdir_match, print_workdir_warning
-
-            matches, session_workdir, current_workdir = check_workdir_match(session_id)
-            if not matches and session_workdir:
-                print_workdir_warning(session_workdir, current_workdir)
+                matches, session_workdir, current_workdir = check_workdir_match(session_id)
+                if not matches and session_workdir:
+                    print_workdir_warning(session_workdir, current_workdir)
 
         elif args.session_options.session_name is not None:
             # Create named session

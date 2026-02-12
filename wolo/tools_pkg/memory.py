@@ -1,14 +1,12 @@
 """Memory tool implementations for Wolo long-term memory.
 
-Provides tools for saving, recalling, listing, and deleting memories.
+Provides tools for saving memories using markdown format.
 Uses LLM to generate structured memory content from conversation context.
 """
 
 import json
 import logging
 from typing import Any
-
-from wolo.memory import Memory, get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +138,11 @@ async def memory_save_execute(
     Returns:
         Result dict with output and metadata
     """
-    storage = get_storage()
+    from wolo.memory import get_markdown_storage
+
+    # Get storage directory from config
+    memories_dir = config.memories_dir if config else None
+    storage = get_markdown_storage(memories_dir)
 
     # If messages and config provided, use LLM to generate structured memory
     if messages and config:
@@ -150,33 +152,25 @@ async def memory_save_execute(
             content = llm_result.get("content", summary)
             extracted_tags = llm_result.get("tags", [])
             all_tags = list(set(extracted_tags + (tags or [])))
-            summary_text = llm_result.get("summary", summary)
         else:
             # Fallback to user input
             title = summary[:50]
             content = summary
             all_tags = tags or []
-            summary_text = summary
     else:
         # No LLM generation, use user input directly
         title = summary[:50]
         content = summary
         all_tags = tags or []
-        summary_text = summary
 
-    # Create memory with truncation
-    memory = Memory.create(
+    # Create memory using markdown storage
+    memory = storage.create_memory(
         title=title,
-        summary=summary_text,
         content=content,
         tags=all_tags,
         source_session=session_id,
-        source_context=context,
         max_content_size=max_content_size,
     )
-
-    # Save
-    storage.save(memory)
 
     return {
         "output": f"Memory saved: {memory.id}\nTitle: {memory.title}\nTags: {', '.join(all_tags)}",
@@ -189,17 +183,21 @@ async def memory_save_execute(
     }
 
 
-async def memory_list_execute(tag_filter: str | None = None) -> dict[str, Any]:
+async def memory_list_execute(tag_filter: str | None = None, config: Any = None) -> dict[str, Any]:
     """Execute memory list tool.
 
     Args:
         tag_filter: Optional tag to filter by
+        config: Optional config to determine storage location
 
     Returns:
         Result dict with output and metadata
     """
-    storage = get_storage()
-    memories = storage.list_all()
+    from wolo.memory import get_markdown_storage
+
+    memories_dir = config.memories_dir if config else None
+    storage = get_markdown_storage(memories_dir)
+    memories = storage.scan_memories()
 
     # Filter by tag if specified
     if tag_filter:
@@ -218,36 +216,36 @@ async def memory_list_execute(tag_filter: str | None = None) -> dict[str, Any]:
         tags_str = ", ".join(mem.tags) if mem.tags else "none"
         lines.append(
             f"  [{mem.id}] {mem.title}\n"
-            f"    {mem.summary}\n"
-            f"    Tags: {tags_str}  |  Created: {mem.created_at}"
+            f"    Tags: {tags_str}  |  Created: {mem.created_at.isoformat()}"
         )
 
     return {
         "output": "\n".join(lines),
         "metadata": {
             "count": len(memories),
-            "memories": [
-                {"id": m.id, "title": m.title, "summary": m.summary, "tags": m.tags}
-                for m in memories
-            ],
+            "memories": [{"id": m.id, "title": m.title, "tags": m.tags} for m in memories],
             "error": None,
         },
     }
 
 
-async def memory_recall_execute(query: str) -> dict[str, Any]:
+async def memory_recall_execute(query: str, config: Any = None) -> dict[str, Any]:
     """Execute memory recall/search tool.
 
     Args:
         query: Search query string (or memory ID for exact match)
+        config: Optional config to determine storage location
 
     Returns:
         Result dict with output and metadata
     """
-    storage = get_storage()
+    from wolo.memory import get_markdown_storage
+
+    memories_dir = config.memories_dir if config else None
+    storage = get_markdown_storage(memories_dir)
 
     # Try exact ID match first
-    exact = storage.load(query)
+    exact = storage.get_memory(query)
     if exact:
         memories = [exact]
     else:
@@ -265,10 +263,9 @@ async def memory_recall_execute(query: str) -> dict[str, Any]:
         tags_str = ", ".join(mem.tags) if mem.tags else "none"
         lines.append(
             f"  [{mem.id}] {mem.title}\n"
-            f"    {mem.summary}\n"
             f"    Tags: {tags_str}\n"
             f"    Content:\n{mem.content}\n"
-            f"    Created: {mem.created_at}"
+            f"    Created: {mem.created_at.isoformat()}"
         )
 
     return {
@@ -279,7 +276,6 @@ async def memory_recall_execute(query: str) -> dict[str, Any]:
                 {
                     "id": m.id,
                     "title": m.title,
-                    "summary": m.summary,
                     "tags": m.tags,
                     "content": m.content,
                 }
@@ -290,17 +286,21 @@ async def memory_recall_execute(query: str) -> dict[str, Any]:
     }
 
 
-async def memory_delete_execute(memory_id: str) -> dict[str, Any]:
+async def memory_delete_execute(memory_id: str, config: Any = None) -> dict[str, Any]:
     """Execute memory delete tool.
 
     Args:
         memory_id: Memory ID to delete
+        config: Optional config to determine storage location
 
     Returns:
         Result dict with output and metadata
     """
-    storage = get_storage()
-    deleted = storage.delete(memory_id)
+    from wolo.memory import get_markdown_storage
+
+    memories_dir = config.memories_dir if config else None
+    storage = get_markdown_storage(memories_dir)
+    deleted = storage.delete_memory(memory_id)
 
     if deleted:
         return {
@@ -314,7 +314,7 @@ async def memory_delete_execute(memory_id: str) -> dict[str, Any]:
         }
 
 
-def load_memories_for_session(queries: list[str]) -> str | None:
+def load_memories_for_session(queries: list[str], config: Any = None) -> str | None:
     """Load memories by ID or search query and return formatted context.
 
     Tries exact ID match first, then search. Combines all found memories
@@ -322,16 +322,20 @@ def load_memories_for_session(queries: list[str]) -> str | None:
 
     Args:
         queries: List of memory IDs or search queries
+        config: Optional config to determine storage location
 
     Returns:
         Formatted memory context string, or None if no memories found
     """
-    storage = get_storage()
-    loaded: list[Memory] = []
+    from wolo.memory import MarkdownMemory, get_markdown_storage
+
+    memories_dir = config.memories_dir if config else None
+    storage = get_markdown_storage(memories_dir)
+    loaded: list[MarkdownMemory] = []
 
     for query in queries:
         # Try exact ID match first
-        exact = storage.load(query)
+        exact = storage.get_memory(query)
         if exact:
             loaded.append(exact)
         else:
@@ -344,7 +348,7 @@ def load_memories_for_session(queries: list[str]) -> str | None:
 
     # Deduplicate by ID while preserving order
     seen: set[str] = set()
-    unique: list[Memory] = []
+    unique: list[MarkdownMemory] = []
     for mem in loaded:
         if mem.id not in seen:
             seen.add(mem.id)

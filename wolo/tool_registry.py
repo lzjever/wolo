@@ -567,70 +567,8 @@ MEMORY_SAVE = ToolSpec(
     _brief_formatter=_memory_save_brief,
 )
 
-
-def _memory_recall_brief(p: dict) -> str:
-    query = p.get("query", "")
-    return f"🧠 recalling: {_truncate(query, 40)}"
-
-
-MEMORY_RECALL = ToolSpec(
-    name="memory_recall",
-    description=load_tool_description("memory_recall"),
-    parameters={
-        "query": {
-            "type": "string",
-            "description": "Search query to find relevant memories",
-        },
-    },
-    required_params=["query"],
-    category=ToolCategory.META,
-    icon="🧠",
-    show_output=True,
-    _brief_formatter=_memory_recall_brief,
-)
-
-
-def _memory_list_brief(p: dict) -> str:
-    tag = p.get("tag_filter", "")
-    return "🧠 listing memories" + (f" (tag: {tag})" if tag else "")
-
-
-MEMORY_LIST = ToolSpec(
-    name="memory_list",
-    description=load_tool_description("memory_list"),
-    parameters={
-        "tag_filter": {
-            "type": "string",
-            "description": "Optional tag to filter memories by",
-        },
-    },
-    required_params=[],
-    category=ToolCategory.META,
-    icon="🧠",
-    show_output=True,
-    _brief_formatter=_memory_list_brief,
-)
-
-
-def _memory_delete_brief(p: dict) -> str:
-    return f"🧠 deleting memory: {p.get('memory_id', '')}"
-
-
-MEMORY_DELETE = ToolSpec(
-    name="memory_delete",
-    description=load_tool_description("memory_delete"),
-    parameters={
-        "memory_id": {
-            "type": "string",
-            "description": "The ID of the memory to delete (e.g., 'mem_250207_abc12345')",
-        },
-    },
-    required_params=["memory_id"],
-    category=ToolCategory.META,
-    icon="🧠",
-    show_output=True,
-    _brief_formatter=_memory_delete_brief,
-)
+# Note: memory_list, memory_recall, memory_delete removed - users should manage
+# memories directly via filesystem (.wolo/memories/*.md or ~/.wolo/memories/*.md)
 
 
 # Skill tool - dynamically generated schema
@@ -706,9 +644,6 @@ class ToolRegistry:
             BATCH,
             SKILL,
             MEMORY_SAVE,
-            MEMORY_RECALL,
-            MEMORY_LIST,
-            MEMORY_DELETE,
         ]
         for spec in defaults:
             self.register(spec)

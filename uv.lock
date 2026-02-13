@@ -845,7 +845,7 @@ wheels = [
 
 [[package]]
 name = "lexilux"
-version = "2.7.2"
+version = "2.8.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
 dependencies = [
     { name = "httpx" },
@@ -853,9 +853,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/2d/92/06d7047ee8e3c09f04dc932955e26139ecd29f9dd68961a2ad9d8778b951/lexilux-2.7.2.tar.gz", hash = "sha256:c7a4243f6e28a758a312abc292441bb17790773c635b9ad7ee40d4f9295e21fa", size = 368322, upload-time = "2026-02-13T04:37:23.515Z" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/af/59/5578046507c3ff3260aad97d60cc5a65596bbc63d32b95b5f4dc6488227f/lexilux-2.8.0.tar.gz", hash = "sha256:511cf235fed1cd9085182c2b9b786dc489fc670afbfb069de76dd805299fb5f3", size = 388974, upload-time = "2026-02-13T17:21:01.007Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/2a/4e/1c7d050f4d8a9f35679ded55042226d0905c8728d7dcca60577afb7be593/lexilux-2.7.2-py3-none-any.whl", hash = "sha256:f38042a94f796ccb8735957235787d643663195b95ca80cc54605e49691bdf49", size = 191232, upload-time = "2026-02-13T04:37:21.8Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/15/9e/b0ba1de37d9ac9534e95b6bf7f5b244bb7f5faee91f340704a55e0b2c8f5/lexilux-2.8.0-py3-none-any.whl", hash = "sha256:2bd49fa5e76a8ec6c530e07d578ff705b408cd5d2c6daffe0a3766f1c1ff7002", size = 206643, upload-time = "2026-02-13T17:20:59.25Z" },
 ]
 
 [[package]]
@@ -979,7 +979,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "exceptiongroup", marker = "python_full_version < '3.11'", specifier = ">=1.0.0" },
     { name = "httpx", extras = ["socks"], specifier = ">=0.28.1" },
-    { name = "lexilux", specifier = ">=2.7.2" },
+    { name = "lexilux", specifier = ">=2.8.0" },
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "pillow", specifier = ">=12.1.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.43" },

@@ -25,15 +25,33 @@ logger = logging.getLogger(__name__)
 _current_session_id: str | None = None
 _watch_server = None
 
+# Reasoning state machine for streaming output
+_REASONING_STATE: str = "normal"  # "normal" | "reasoning"
+
 
 def _on_text_delta(d: dict) -> None:
-    """Handle text delta events - streaming AI response."""
-    print_text(d.get("text", ""))
+    """Handle text delta events - streaming AI response with reasoning state machine."""
+    global _REASONING_STATE
+
+    text = d.get("text", "")
+    is_reasoning = d.get("reasoning", False)
+
+    # State machine transitions
+    if is_reasoning and _REASONING_STATE == "normal":
+        # Enter reasoning mode: output opening tag
+        _REASONING_STATE = "reasoning"
+        print("<?", end="", flush=True)
+
+    if not is_reasoning and _REASONING_STATE == "reasoning":
+        # Exit reasoning mode: output closing tag
+        _REASONING_STATE = "normal"
+        print("?>", end="", flush=True)
+
+    # Output the text
+    print_text(text)
 
     # Broadcast to watch server
-    _broadcast_to_watch_server(
-        {"type": "text-delta", "text": d.get("text", ""), "reasoning": d.get("reasoning", False)}
-    )
+    _broadcast_to_watch_server({"type": "text-delta", "text": text, "reasoning": is_reasoning})
 
 
 def _on_tool_start(d: dict) -> None:
@@ -96,6 +114,13 @@ def _on_tool_result(d: dict) -> None:
 
 def _on_finish(d: dict) -> None:
     """Handle finish events."""
+    global _REASONING_STATE
+
+    # Close any open reasoning tag
+    if _REASONING_STATE == "reasoning":
+        print("?>", end="", flush=True)
+        _REASONING_STATE = "normal"
+
     print_finish()
 
     reason = d.get("reason", "unknown")
@@ -123,6 +148,9 @@ def _broadcast_to_watch_server(event: dict) -> None:
 
 def setup_event_handlers() -> None:
     """Setup event handlers for CLI output."""
+    global _REASONING_STATE
+    _REASONING_STATE = "normal"  # Reset state machine
+
     # Subscribe to events
     bus.subscribe("text-delta", _on_text_delta)
     bus.subscribe("tool-start", _on_tool_start)

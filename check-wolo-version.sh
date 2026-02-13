@@ -32,23 +32,19 @@ else
 fi
 echo ""
 
-# 检查 print_session_info 是否包含 MINIMAL 检查
+# 检查输出模块是否正常加载
 echo "4. 代码功能检查:"
 python -c "
-import inspect
 try:
-    from wolo.cli.utils import print_session_info
-    source = inspect.getsource(print_session_info)
-    if 'OutputStyle.MINIMAL' in source:
-        print('  ✅ print_session_info 包含 MINIMAL 检查')
-    else:
-        print('  ❌ print_session_info 缺少 MINIMAL 检查')
+    from wolo.cli.output import print_agent_start, print_text, print_finish
+    from wolo.cli.events import setup_event_handlers
+    print('  ✅ 输出模块加载正常')
 except Exception as e:
     print(f'  ❌ 检查失败: {e}')
 " 2>/dev/null || echo "  ❌ 无法检查"
 echo ""
 
 echo "=== 推荐使用方式 ==="
-echo "  快速测试: ./wolo-dev -O minimal 'test'"
-echo "  标准方式: uv run wolo -O minimal 'test'"
-echo "  开发模式: uv pip install -e . && wolo -O minimal 'test'"
+echo "  快速测试: ./wolo-dev 'test'"
+echo "  标准方式: uv run wolo 'test'"
+echo "  开发模式: uv pip install -e . && wolo 'test'"

@@ -845,16 +845,17 @@ wheels = [
 
 [[package]]
 name = "lexilux"
-version = "2.5.0"
+version = "2.7.2"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
 dependencies = [
     { name = "httpx" },
     { name = "requests" },
+    { name = "tenacity" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/53/ca/f3f8724825423ffca30ca0f9442f4f8d6b657b5929bcb489f4d782cfa181/lexilux-2.5.0.tar.gz", hash = "sha256:682dce453f212d5fb7f7dc2ec21b12e05ccd50f5f54718c757525ea46df9eb8c", size = 297338, upload-time = "2026-01-26T22:12:19.412Z" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/2d/92/06d7047ee8e3c09f04dc932955e26139ecd29f9dd68961a2ad9d8778b951/lexilux-2.7.2.tar.gz", hash = "sha256:c7a4243f6e28a758a312abc292441bb17790773c635b9ad7ee40d4f9295e21fa", size = 368322, upload-time = "2026-02-13T04:37:23.515Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/8c/4c/84c271f264f07b8c47050706e1d53b2588d39f00a199e1e243eda160cd12/lexilux-2.5.0-py3-none-any.whl", hash = "sha256:5e5b1efeae4c563a9728865cb211de9cb902633de1138ba3d24c3682fd4ded66", size = 177601, upload-time = "2026-01-26T22:12:18.24Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/2a/4e/1c7d050f4d8a9f35679ded55042226d0905c8728d7dcca60577afb7be593/lexilux-2.7.2-py3-none-any.whl", hash = "sha256:f38042a94f796ccb8735957235787d643663195b95ca80cc54605e49691bdf49", size = 191232, upload-time = "2026-02-13T04:37:21.8Z" },
 ]
 
 [[package]]
@@ -978,7 +979,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "exceptiongroup", marker = "python_full_version < '3.11'", specifier = ">=1.0.0" },
     { name = "httpx", extras = ["socks"], specifier = ">=0.28.1" },
-    { name = "lexilux", specifier = ">=2.5.0" },
+    { name = "lexilux", specifier = ">=2.7.2" },
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "pillow", specifier = ">=12.1.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.43" },
@@ -2104,6 +2105,15 @@ dependencies = [
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.1.4"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
 ]
 
 [[package]]

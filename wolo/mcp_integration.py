@@ -14,6 +14,16 @@ from .claude.mcp_config import MCPServerConfig, merge_mcp_configs
 from .claude.skill_loader import load_all_skills
 from .config import Config
 from .mcp import MCPServerManager, check_npx_available
+from .mcp.cache import (
+    MCPCache,
+    filter_cache_by_servers,
+    get_cached_tool_schemas,
+    is_cache_valid,
+    load_cache,
+    rebuild_cache_from_servers,
+    save_cache,
+    update_server_cache,
+)
 from .tool_registry import ToolCategory, ToolSpec, get_registry
 
 try:
@@ -27,6 +37,8 @@ logger = logging.getLogger(__name__)
 # Global state
 _mcp_manager: MCPServerManager | None = None
 _skills: list[ClaudeSkill] = []  # Renamed from _claude_skills
+_mcp_cache: MCPCache | None = None  # MCP tools cache
+_using_cached_tools: bool = False  # Whether we're currently using cached tools
 
 
 async def initialize_mcp(config: Config) -> MCPServerManager:
@@ -39,13 +51,16 @@ async def initialize_mcp(config: Config) -> MCPServerManager:
 
     And starts all configured MCP servers.
 
+    Tools are loaded from cache immediately for fast startup, then
+    refreshed from actual MCP servers as they connect.
+
     Args:
         config: Wolo configuration
 
     Returns:
         MCPServerManager instance
     """
-    global _mcp_manager  # _skills is already global (line 29)
+    global _mcp_manager, _mcp_cache, _using_cached_tools
 
     # Determine node strategy
     node_strategy = config.mcp.node_strategy
@@ -118,8 +133,25 @@ async def initialize_mcp(config: Config) -> MCPServerManager:
     )
     logger.info(f"Loaded {len(_skills)} skills total")
 
+    # Load MCP cache and register cached tools immediately
+    _mcp_cache = load_cache()
+
+    # Filter cache to only include servers in current configuration
+    # This removes stale entries for deleted servers
+    current_server_names = set(all_servers.keys())
+    _mcp_cache = filter_cache_by_servers(_mcp_cache, current_server_names)
+
+    if is_cache_valid(_mcp_cache):
+        _register_cached_tools()
+        _using_cached_tools = True
+        logger.info("Using cached MCP tools for fast startup")
+
     # Start MCP servers in background (non-blocking)
-    _mcp_manager.start_background_init()
+    # This will update tools as servers connect
+    _mcp_manager.start_background_init_with_callback(
+        on_connected=_on_server_connected,
+        on_complete=_on_init_complete,
+    )
 
     return _mcp_manager
 
@@ -150,6 +182,122 @@ async def initialize_mcp_blocking(config: Config) -> MCPServerManager:
 
 
 _registered_mcp_tools: set[str] = set()
+
+
+def _register_cached_tools() -> None:
+    """
+    Register MCP tools from cache immediately.
+
+    This allows tools to be available before MCP servers fully connect.
+    """
+    global _registered_mcp_tools
+
+    if not _mcp_cache:
+        return
+
+    registry = get_registry()
+
+    for server_name, server_cache in _mcp_cache.servers.items():
+        if server_cache.status != "running":
+            continue
+
+        for tool in server_cache.tools:
+            # Handle both cached schema format and raw tool format
+            if "function" in tool:
+                tool_name = tool["function"]["name"]
+                description = tool["function"].get("description", "")
+                parameters = tool["function"].get("parameters", {})
+            else:
+                tool_name = f"mcp_{server_name}__{tool.get('name', 'unknown')}"
+                description = tool.get("description", "")
+                parameters = tool.get("input_schema", tool.get("inputSchema", {}))
+
+            # Skip if already registered
+            if tool_name in _registered_mcp_tools:
+                continue
+
+            # Create ToolSpec for MCP tool
+            spec = ToolSpec(
+                name=tool_name,
+                description=description,
+                parameters=parameters.get("properties", {}),
+                required_params=parameters.get("required", []),
+                category=ToolCategory.WEB,
+                icon="🔌",
+                show_output=False,
+            )
+            registry.register(spec)
+            _registered_mcp_tools.add(tool_name)
+            logger.debug(f"Registered cached MCP tool: {tool_name}")
+
+
+async def _on_server_connected(server_name: str, tools: list) -> None:
+    """
+    Callback when an MCP server connects successfully.
+
+    Updates the cache and refreshes the tool registry.
+
+    Args:
+        server_name: Name of the connected server
+        tools: List of MCPTool objects from the server
+    """
+    global _mcp_cache, _using_cached_tools
+
+    logger.info(f"MCP server connected: {server_name} ({len(tools)} tools)")
+
+    # Update cache with fresh tool data
+    tool_schemas = []
+    for tool in tools:
+        tool_schemas.append(
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.input_schema,
+            }
+        )
+
+    _mcp_cache = update_server_cache(_mcp_cache, server_name, tool_schemas, "running")
+
+    # Save updated cache
+    save_cache(_mcp_cache)
+
+    # Register new tools (idempotent)
+    _register_mcp_tools()
+
+
+async def _on_init_complete() -> None:
+    """
+    Callback when MCP initialization completes.
+
+    Rebuilds cache from actual server states and saves it.
+    This ensures cache only contains currently connected servers.
+    """
+    global _mcp_cache, _using_cached_tools
+
+    _using_cached_tools = False
+    logger.info("MCP initialization complete, using live tools")
+
+    if not _mcp_manager:
+        return
+
+    # Rebuild cache from actual server states
+    server_states = {}
+    for server_name, state in _mcp_manager._servers.items():
+        server_states[server_name] = {
+            "status": state.status.value,
+            "tools": [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema,
+                }
+                for tool in state.tools
+            ],
+        }
+
+    _mcp_cache = rebuild_cache_from_servers(_mcp_cache, server_states)
+    save_cache(_mcp_cache)
+    logger.debug(f"Cache rebuilt with {len(_mcp_cache.servers)} connected servers")
 
 
 def _register_mcp_tools() -> None:
@@ -213,13 +361,21 @@ def get_mcp_tool_schemas() -> list[dict]:
     """
     Get all MCP tool schemas for LLM.
 
+    Returns cached tools if MCP manager is not yet initialized,
+    otherwise returns live tools from connected servers.
+
     Returns:
         List of tool schemas
     """
-    if not _mcp_manager:
-        return []
+    # If manager exists and has connected servers, use live tools
+    if _mcp_manager and _mcp_manager.get_all_tools():
+        return _mcp_manager.get_tool_schemas()
 
-    return _mcp_manager.get_tool_schemas()
+    # Fall back to cached tools
+    if _mcp_cache:
+        return get_cached_tool_schemas(_mcp_cache)
+
+    return []
 
 
 def get_claude_skills() -> list[ClaudeSkill]:
@@ -245,7 +401,12 @@ def find_matching_skill(query: str) -> ClaudeSkill | None:
 
 async def shutdown_mcp() -> None:
     """Shutdown MCP integration."""
-    global _mcp_manager
+    global _mcp_manager, _mcp_cache
+
+    # Save cache before shutdown (contains latest tool info)
+    if _mcp_cache:
+        save_cache(_mcp_cache)
+        logger.debug("Saved MCP cache before shutdown")
 
     # Stop MCP servers
     if _mcp_manager:
@@ -293,25 +454,20 @@ def get_mcp_status() -> dict:
         - enabled: Whether MCP manager exists
         - initializing: Whether background init is in progress
         - initialized: Whether init is complete
+        - using_cache: Whether currently using cached tools
+        - cache_valid: Whether cache is valid
         - servers: Per-server status dict
         - skills_count: Number of loaded skills
         - node_available: Whether Node.js is available
     """
-    if not _mcp_manager:
-        return {
-            "enabled": False,
-            "initializing": False,
-            "initialized": False,
-            "servers": {},
-            "skills_count": len(_skills),
-            "node_available": check_npx_available(),
-        }
-
     return {
-        "enabled": True,
-        "initializing": _mcp_manager.is_initializing,
-        "initialized": _mcp_manager.is_initialized,
-        "servers": _mcp_manager.get_status(),
+        "enabled": _mcp_manager is not None,
+        "initializing": _mcp_manager.is_initializing if _mcp_manager else False,
+        "initialized": _mcp_manager.is_initialized if _mcp_manager else False,
+        "using_cache": _using_cached_tools,
+        "cache_valid": is_cache_valid(_mcp_cache),
+        "cache_servers": len(_mcp_cache.servers) if _mcp_cache else 0,
+        "servers": _mcp_manager.get_status() if _mcp_manager else {},
         "skills_count": len(_skills),
         "node_available": check_npx_available(),
     }

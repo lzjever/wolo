@@ -16,7 +16,9 @@ from wolo.session import (
     find_last_user_message,
     get_pending_tool_calls,
     get_session_messages,
+    get_session_mode,
     has_pending_tool_calls,
+    update_session_mode,
 )
 
 
@@ -171,6 +173,50 @@ class TestSessionPersistence:
             assert len(messages) == 2
             assert messages[0].role == "user"
             assert messages[1].role == "assistant"
+
+
+class TestExecutionMode:
+    """Test execution mode persistence functionality."""
+
+    def test_default_mode_is_solo(self):
+        """Test that new sessions default to solo mode."""
+        session_id = create_session()
+        mode = get_session_mode(session_id)
+        assert mode == "solo"
+
+    def test_update_session_mode(self):
+        """Test updating session execution mode."""
+        session_id = create_session()
+
+        # Update to coop
+        update_session_mode(session_id, "coop")
+        mode = get_session_mode(session_id)
+        assert mode == "coop"
+
+        # Update to repl
+        update_session_mode(session_id, "repl")
+        mode = get_session_mode(session_id)
+        assert mode == "repl"
+
+    def test_mode_persists_after_save_load(self):
+        """Test that execution mode persists after save/load."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from wolo.session import _sessions, load_session, save_session
+
+            original_sessions = Path(tmpdir)
+
+            session_id = create_session()
+            update_session_mode(session_id, "coop")
+
+            save_session(session_id, sessions_dir=original_sessions)
+
+            # Clear in-memory session
+            if session_id in _sessions:
+                del _sessions[session_id]
+
+            # Load session and verify mode persisted
+            loaded = load_session(session_id, sessions_dir=original_sessions)
+            assert loaded.execution_mode == "coop"
 
 
 if __name__ == "__main__":

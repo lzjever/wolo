@@ -112,6 +112,8 @@ class Session:
     # Actual token count from LLM responses (more accurate than estimation)
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    # Execution mode for session restoration (solo/coop/repl)
+    execution_mode: str = "solo"
 
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
@@ -124,30 +126,16 @@ class Session:
 # ==================== Helper Functions ====================
 
 
-def _generate_session_id(agent_name: str) -> str:
+def _generate_session_id() -> str:
     """
-    生成 session_id: {AgentName}_{YYMMDD}_{HHMMSS}
-
-    Args:
-        agent_name: Agent 显示名称（可能包含空格）
+    Generate a simple UUID-based session ID.
 
     Returns:
-        session_id 字符串，格式：{SanitizedName}_{YYMMDD}_{HHMMSS}
+        session_id string (UUID format, first 8 chars)
     """
-    # 去除 agent_name 中的所有空格
-    sanitized_name = agent_name.replace(" ", "")
+    import uuid
 
-    # 获取当前时间
-    now = datetime.now()
-
-    # 格式化时间戳：YYMMDD_HHMMSS
-    # 年份只取后2位，例如 2026 -> 26
-    timestamp = now.strftime("%y%m%d_%H%M%S")
-
-    # 组合：{sanitized_name}_{timestamp}
-    session_id = f"{sanitized_name}_{timestamp}"
-
-    return session_id
+    return uuid.uuid4().hex[:8]
 
 
 # ==================== Process Status Checking ====================
@@ -298,73 +286,36 @@ class SessionStorage:
     def create_session(
         self,
         session_id: str | None = None,
-        agent_name: str | None = None,
         workdir: str | None = None,
     ) -> str:
         """
         Create a new session with immediate persistence.
 
         Args:
-            session_id: 手动指定的 session_id，如果为 None 则自动生成
-            agent_name: 用于生成 session_id 的 agent 名称，仅在 session_id 为 None 时使用
-            workdir: 工作目录，如果为 None 则使用当前目录
+            session_id: Optional session ID. If None, generates a UUID.
+            workdir: Working directory. If None, uses current directory.
 
         Returns:
-            session_id 字符串
+            session_id string
 
         Raises:
-            ValueError: 如果指定的 session_id 已存在或包含非法字符
+            ValueError: If session_id already exists or contains invalid characters
         """
-        # Track if session_id was user-provided (for retry logic)
-        user_provided_id = session_id is not None
-
-        # 如果未指定 session_id，则自动生成
+        # Generate UUID if not provided
         if session_id is None:
-            if agent_name is None:
-                # 如果没有提供 agent_name，使用随机生成的名称
-                from wolo.agent_names import get_random_agent_name
-
-                agent_name = get_random_agent_name()
-            session_id = _generate_session_id(agent_name)
+            session_id = _generate_session_id()
         else:
-            # 验证用户提供的 session_id
+            # Validate user-provided session_id
             self._validate_session_id(session_id)
 
-        # 检查 session_id 是否已存在
-        # 对于用户提供的ID，直接报错；对于自动生成的ID，带重试机制
-        if user_provided_id:
-            if self.session_exists(session_id):
-                raise ValueError(
-                    f"Session '{session_id}' already exists. Please use a different name."
-                )
-        else:
-            # Auto-generated ID: retry logic for parallel test scenarios
-            max_retries = 5
-            for attempt in range(max_retries):
-                if not self.session_exists(session_id):
-                    break
-                if attempt < max_retries - 1:
-                    # Session ID collision, wait and regenerate with new timestamp
-                    time.sleep(0.6)  # Wait 600ms to ensure timestamp changes
-                    if agent_name is None:
-                        from wolo.agent_names import get_random_agent_name
+        # Check if session already exists
+        if self.session_exists(session_id):
+            raise ValueError(f"Session '{session_id}' already exists. Please use a different name.")
 
-                        agent_name = get_random_agent_name()
-                    session_id = _generate_session_id(agent_name)
-                else:
-                    raise ValueError(
-                        f"Session '{session_id}' already exists. Please use a different name."
-                    )
-
+        # Create session directory
         session_dir = self._session_dir(session_id)
         session_dir.mkdir(parents=True, exist_ok=True)
         self._messages_dir(session_id).mkdir(exist_ok=True)
-
-        # If agent_name was provided, use it; otherwise generate one
-        if agent_name is None:
-            from wolo.agent_names import get_random_agent_name
-
-            agent_name = get_random_agent_name()
 
         # Default workdir to current directory if not specified
         if workdir is None:
@@ -378,13 +329,14 @@ class SessionStorage:
             "agent_type": None,
             "title": None,
             "tags": [],
-            "agent_display_name": agent_name,  # Store the agent name
-            "pid": None,  # 新增：当前运行进程的 PID
-            "pid_updated_at": None,  # 新增：PID 更新时间
-            "workdir": workdir,  # 工作目录
+            "agent_display_name": None,  # No default name - AI learns its name
+            "pid": None,
+            "pid_updated_at": None,
+            "workdir": workdir,
+            "execution_mode": "solo",
         }
         self._write_json(self._session_file(session_id), metadata)
-        logger.debug(f"Created session {session_id[:8]}...")
+        logger.debug(f"Created session {session_id}")
         return session_id
 
     def get_session_metadata(self, session_id: str) -> dict | None:
@@ -393,27 +345,18 @@ class SessionStorage:
 
     def get_or_create_agent_display_name(self, session_id: str) -> str:
         """
-        Get agent display name from session, or create a new one if not exists.
+        Get agent display name from session.
 
         Args:
             session_id: Session ID
 
         Returns:
-            Agent display name
+            Agent display name (defaults to "Assistant" if not set)
         """
         metadata = self.get_session_metadata(session_id)
         if metadata and metadata.get("agent_display_name"):
             return metadata["agent_display_name"]
-
-        # Generate new name and save it
-        from wolo.agent_names import get_random_agent_name
-
-        agent_display_name = get_random_agent_name()
-        self.update_session_metadata(session_id, agent_display_name=agent_display_name)
-        logger.debug(
-            f"Generated new agent display name: {agent_display_name} for session {session_id[:8]}..."
-        )
-        return agent_display_name
+        return "Assistant"
 
     def update_session_metadata(self, session_id: str, **kwargs) -> None:
         """Update session metadata fields."""
@@ -615,6 +558,7 @@ class SessionStorage:
         session.tags = metadata.get("tags", [])
         session.total_input_tokens = metadata.get("total_input_tokens", 0)
         session.total_output_tokens = metadata.get("total_output_tokens", 0)
+        session.execution_mode = metadata.get("execution_mode", "solo")
         session.messages = self.get_all_messages(session_id)
 
         return session
@@ -639,6 +583,7 @@ class SessionStorage:
             "tags": session.tags,
             "total_input_tokens": session.total_input_tokens,
             "total_output_tokens": session.total_output_tokens,
+            "execution_mode": session.execution_mode,
             # Preserve fields from existing metadata
             "agent_display_name": existing_metadata.get("agent_display_name"),
             "pid": existing_metadata.get("pid"),
@@ -871,27 +816,22 @@ def _deserialize_message(data: dict[str, Any]) -> Message:
 # ==================== Public API (Backward Compatible) ====================
 
 
-def create_session(
-    session_id: str | None = None, agent_name: str | None = None, workdir: str | None = None
-) -> str:
+def create_session(session_id: str | None = None, workdir: str | None = None) -> str:
     """
     Create a new session.
 
     Args:
-        session_id: 手动指定的 session_id，如果为 None 则自动生成
-        agent_name: 用于生成 session_id 的 agent 名称，仅在 session_id 为 None 时使用
-        workdir: 工作目录，如果为 None 则使用当前目录
+        session_id: Optional session ID. If None, generates a UUID.
+        workdir: Working directory. If None, uses current directory.
 
     Returns:
-        session_id 字符串
+        session_id string
 
     Raises:
-        ValueError: 如果指定的 session_id 已存在
+        ValueError: If session_id already exists
     """
     storage = get_storage()
-    session_id = storage.create_session(
-        session_id=session_id, agent_name=agent_name, workdir=workdir
-    )
+    session_id = storage.create_session(session_id=session_id, workdir=workdir)
 
     # Also create in-memory
     _sessions[session_id] = Session(id=session_id)
@@ -1362,6 +1302,38 @@ def reset_session_token_usage(session_id: str) -> None:
             total_input_tokens=0,
             total_output_tokens=0,
         )
+
+
+# ==================== Execution Mode Persistence ====================
+
+
+def update_session_mode(session_id: str, mode: str) -> None:
+    """Update session's execution mode.
+
+    Args:
+        session_id: Session ID
+        mode: Execution mode (solo/coop/repl)
+    """
+    session = get_session(session_id)
+    if session:
+        session.execution_mode = mode
+        session.updated_at = time.time()
+        get_storage().update_session_metadata(session_id, execution_mode=mode)
+
+
+def get_session_mode(session_id: str) -> str:
+    """Get session's execution mode.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        Execution mode (solo/coop/repl), defaults to "solo"
+    """
+    session = get_session(session_id)
+    if session:
+        return session.execution_mode
+    return "solo"
 
 
 # ==================== Todos Persistence ====================

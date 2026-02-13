@@ -167,8 +167,10 @@ Usage:
   cat file | wolo "analyze this"        Context + prompt
 
 Session:
-  wolo -r <id>                          Resume session (REPL mode)
-  wolo -r <id> --solo "prompt"          Resume session (one-shot)
+  wolo -r <id>                          Resume session (restores previous mode)
+  wolo -r <id> --solo "prompt"          Resume session (force solo mode)
+  wolo -r <id> --coop "prompt"          Resume session (force coop mode)
+  wolo -r <id> --repl                   Resume session (force REPL mode)
   wolo -l                               List sessions
   wolo -w <id>                          Watch running session
 
@@ -263,13 +265,22 @@ def main() -> int:
         print(error_msg, file=sys.stderr)
         return ExitCode.ERROR
 
-    # Handle -r/--resume: default to REPL mode unless --solo is explicit
+    # Handle -r/--resume: restore mode from session unless user specifies mode
     if parsed.session_options.resume_id is not None:
         from wolo.modes import ExecutionMode
+        from wolo.session import get_session_mode
 
-        if "--solo" not in args:
-            # Resume defaults to REPL mode
-            parsed.execution_options.mode = ExecutionMode.REPL
+        # Check if user explicitly specified a mode
+        user_specified_mode = "--solo" in args or "--coop" in args or "--repl" in args
+
+        if not user_specified_mode:
+            # User didn't specify mode, restore from session
+            try:
+                session_mode = get_session_mode(parsed.session_options.resume_id)
+                parsed.execution_options.mode = ExecutionMode(session_mode)
+            except Exception:
+                # Fallback to REPL if session not found
+                parsed.execution_options.mode = ExecutionMode.REPL
 
     # Extract subcommand for command groups
     if command_type in ("session", "config") and remaining_args:

@@ -44,7 +44,7 @@ Wolo is a minimal Python AI agent CLI tool supporting multiple OpenAI-compatible
 
 ### Core Components
 
-- **Agent Loop** (`wolo/agent.py`): Main execution loop with doom loop detection, step boundary control, and LLM/tool orchestration.
+- **Agent Loop** (`wolo/agent.py`): Main execution loop with doom loop detection and LLM/tool orchestration.
 
 - **LLM Adapter** (`wolo/llm_adapter.py`): Uses `lexilux` library for OpenAI-compatible API communication. Handles streaming, token tracking, and reasoning mode (`enable_think`).
 
@@ -63,7 +63,7 @@ Wolo is a minimal Python AI agent CLI tool supporting multiple OpenAI-compatible
 
 - **MCP Integration** (`wolo/mcp_integration.py`): Loads MCP servers from both Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`) and Wolo config.
 
-- **Control System** (`wolo/control.py`): User interruptions via Ctrl+A (interject), Ctrl+B (interrupt), Ctrl+P (pause).
+- **Control System** (`wolo/control.py`): Simple interrupt tracking via Ctrl+C (KeyboardInterrupt).
 
 - **Context State** (`wolo/context_state/`): Concurrent-safe session isolation using contextvars for token tracking, doom loop history, and todos.
 
@@ -71,8 +71,9 @@ Wolo is a minimal Python AI agent CLI tool supporting multiple OpenAI-compatible
 
 - `main.py` - Entry point with async initialization
 - `parser.py` - Argument parsing
+- `output.py` - Simple output functions (no colors, KISS principle)
+- `events.py` - Event handlers connecting agent events to output
 - `commands/` - Subcommands (run, repl, config, session)
-- `output/` - Output formatters (default, minimal, verbose via `-O` flag)
 
 ## Agent Types
 
@@ -139,9 +140,8 @@ path_safety:
 
 ### Control Flow Integration
 When adding operations to agent loop:
-- `control.should_interrupt()` - Should we stop immediately?
-- `await control.wait_if_paused()` - Wait if paused
-- `control.check_step_boundary()` - Step boundaries
+- `control.should_interrupt()` - Should we stop immediately (Ctrl+C)?
+- `control.check_step_boundary()` - Step boundaries (simplified, returns None)
 
 ### Message Persistence
 Always use `SessionSaver` for debounced saves and call `flush()` in finally blocks. Writes use file locking.

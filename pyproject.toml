@@ -37,7 +37,7 @@ dependencies = [
     "httpx[socks]>=0.28.1",
     "psutil>=5.9.0",
     "exceptiongroup>=1.0.0; python_version < '3.11'",
-    "lexilux>=2.5.0",
+    "lexilux>=2.7.2",
     "rich>=13.0.0",
 ]
 

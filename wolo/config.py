@@ -427,16 +427,6 @@ class Config:
             except ValueError:
                 context_window = 128000
 
-        # Log warning if using config file API key (less secure)
-        if not env_key and not api_key:
-            if selected_endpoint and key == selected_endpoint.api_key:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "API key read from config file. "
-                    "For better security, use environment variable WOLO_API_KEY."
-                )
-
         # Load MCP servers from config file or environment variable
         mcp_servers = config_data.get("mcp_servers", [])
         if not mcp_servers:

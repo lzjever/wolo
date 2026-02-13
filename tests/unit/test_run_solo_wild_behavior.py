@@ -20,10 +20,6 @@ def _make_args() -> ParsedArgs:
     args.execution_options.save_session = False
     args.execution_options.benchmark_mode = False
     args.execution_options.benchmark_output = ""
-    args.execution_options.no_color = True
-    args.execution_options.output_style = "minimal"
-    args.execution_options.show_reasoning = False
-    args.execution_options.json_output = False
     args.message = "do work"
     args.cli_prompt = "do work"
     return args
@@ -49,7 +45,6 @@ def test_solo_mode_forces_wild_when_not_explicit(capsys):
         patch("wolo.config.Config.from_env", return_value=config),
         patch("wolo.agents.AGENTS", {"general": object()}),
         patch("wolo.agents.get_agent", return_value=MagicMock()),
-        patch("wolo.agent_names.get_random_agent_name", return_value="test-agent"),
         patch("wolo.session.create_session", return_value="sid-1"),
         patch("wolo.session.check_and_set_session_pid", return_value=True),
         patch("wolo.cli.path_guard.initialize_path_guard_for_session"),
@@ -62,8 +57,6 @@ def test_solo_mode_forces_wild_when_not_explicit(capsys):
     assert result == 0
     assert config.path_safety.wild_mode is True
     mock_print_session_info.assert_not_called()
-    captured = capsys.readouterr()
-    assert "SOLO mode enables --wild automatically" in captured.err
 
 
 def test_solo_mode_explicit_wild_does_not_warn(capsys):
@@ -88,7 +81,6 @@ def test_solo_mode_explicit_wild_does_not_warn(capsys):
         patch("wolo.config.Config.from_env", return_value=config),
         patch("wolo.agents.AGENTS", {"general": object()}),
         patch("wolo.agents.get_agent", return_value=MagicMock()),
-        patch("wolo.agent_names.get_random_agent_name", return_value="test-agent"),
         patch("wolo.session.create_session", return_value="sid-1"),
         patch("wolo.session.check_and_set_session_pid", return_value=True),
         patch("wolo.cli.path_guard.initialize_path_guard_for_session"),
@@ -101,5 +93,3 @@ def test_solo_mode_explicit_wild_does_not_warn(capsys):
     assert result == 0
     assert config.path_safety.wild_mode is True
     mock_print_session_info.assert_not_called()
-    captured = capsys.readouterr()
-    assert "SOLO mode enables --wild automatically" not in captured.err

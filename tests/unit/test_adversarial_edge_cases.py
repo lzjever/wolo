@@ -429,16 +429,14 @@ class TestHandlePendingToolsEdgeCases(unittest.IsolatedAsyncioTestCase):
         mock_exec.side_effect = fake_exec
 
         # Control mock: allow first tool, interrupt before second
-        # should_interrupt is called: before tool1, before tool2, after loop exits
         control = MagicMock()
         interrupt_values = iter([False, True, True, True])  # extra Trues for safety
         control.should_interrupt.side_effect = lambda: next(interrupt_values, True)
-        control.wait_if_paused = AsyncMock()
 
         config = MagicMock()
         agent_config = AgentConfig(name="test", description="", permissions=[], system_prompt="")
 
-        await _handle_pending_tools(msg, control, None, agent_config, "s1", config, 1, "Test")
+        await _handle_pending_tools(msg, control, agent_config, "s1", config, 1)
 
         # First tool completed
         self.assertEqual(t1.status, "completed")
@@ -472,9 +470,7 @@ class TestHandlePendingToolsEdgeCases(unittest.IsolatedAsyncioTestCase):
         config = MagicMock()
         agent_config = AgentConfig(name="test", description="", permissions=[], system_prompt="")
 
-        should_cont, _, _, _ = await _handle_pending_tools(
-            msg, None, None, agent_config, "s1", config, 1, "Test"
-        )
+        should_cont, _, _ = await _handle_pending_tools(msg, None, agent_config, "s1", config, 1)
 
         self.assertTrue(should_cont)
         self.assertEqual(t1.status, "error")

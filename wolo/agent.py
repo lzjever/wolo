@@ -1,4 +1,4 @@
-"""Agent loop for Wolo - Refactored version."""
+"""Agent loop for Wolo - Simplified version (KISS)."""
 
 import hashlib
 import json
@@ -21,7 +21,6 @@ from wolo.session import (
     TextPart,
     ToolPart,
     add_assistant_message,
-    add_user_message,
     find_last_assistant_message,
     find_last_user_message,
     get_pending_tool_calls,
@@ -113,70 +112,32 @@ def _check_doom_loop(tool_name: str, tool_input: dict[str, Any]) -> bool:
     return False
 
 
-async def _handle_step_boundary(
-    control: Optional["ControlManager"],
-    ui: Any | None,
-    session_id: str,
-    agent_config: AgentConfig,
-    step: int,
-    max_steps: int,
-    agent_display_name: str,
-) -> tuple[bool, str | None]:
-    """Handle step boundary control checkpoints. Returns (should_continue, user_input)."""
-    if not control:
-        return True, None
-
-    control.set_step(step + 1, max_steps)
-    check_result = control.check_step_boundary()
-
-    if check_result == "WAIT":
-        logger.info("Waiting for user input at step boundary")
-        user_input = await ui.wait_for_input_with_keyboard() if ui else None
-
-        from wolo.control import ControlState
-
-        control._set_state(ControlState.RUNNING)
-
-        if user_input:
-            add_user_message(session_id, user_input)
-            logger.info(f"User interjected: {user_input[:50]}...")
-            print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
-
-        return True, user_input
-
-    return True, None
-
-
 async def _handle_pending_tools(
     last_assistant: Message,
     control: Optional["ControlManager"],
-    ui: Any | None,
     agent_config: AgentConfig,
     session_id: str,
     config: Config,
     step: int,
-    agent_display_name: str,
     saver: Optional["SessionSaver"] = None,
-) -> tuple[bool, str | None, int, float]:
-    """Handle pending tool calls. Returns (should_continue, user_input, new_step, tool_duration_ms)."""
+) -> tuple[bool, int, float]:
+    """Handle pending tool calls. Returns (should_continue, new_step, tool_duration_ms)."""
     if not has_pending_tool_calls(last_assistant):
-        return True, None, step, 0.0
+        return True, step, 0.0
 
     pending = get_pending_tool_calls(last_assistant)
     logger.info(f"Executing {len(pending)} pending tool calls")
     tool_start_time = time.time()
 
     for tool_call in pending:
-        if control:
-            if control.should_interrupt():
-                logger.info("Interrupted before tool execution")
-                tool_call.status = "interrupted"
-                tool_call.output = "[Tool execution interrupted by user]"
-                # Auto-save on interrupt
-                if saver:
-                    saver.save(force=True)
-                break
-            await control.wait_if_paused()
+        if control and control.should_interrupt():
+            logger.info("Interrupted before tool execution")
+            tool_call.status = "interrupted"
+            tool_call.output = "[Tool execution interrupted by user]"
+            # Auto-save on interrupt
+            if saver:
+                saver.save(force=True)
+            break
 
         try:
             await execute_tool(tool_call, agent_config, session_id, config)
@@ -200,24 +161,7 @@ async def _handle_pending_tools(
             saver.save()
 
     tool_duration_ms = (time.time() - tool_start_time) * 1000
-
-    # Check for interrupt after tool execution
-    if control and control.should_interrupt():
-        from wolo.control import ControlState
-
-        control._set_state(ControlState.WAIT_INPUT)
-        logger.info("Waiting for user input after interrupt")
-        user_input = await ui.wait_for_input_with_keyboard() if ui else None
-        control._set_state(ControlState.RUNNING)
-
-        if user_input:
-            add_user_message(session_id, user_input)
-            print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
-            return True, user_input, step, tool_duration_ms
-        else:
-            return False, None, step, tool_duration_ms
-
-    return True, None, step, tool_duration_ms
+    return True, step, tool_duration_ms
 
 
 def _should_exit_loop(
@@ -255,32 +199,6 @@ def _should_exit_loop(
     else:
         logger.info(f"Continuing with {len(incomplete_todos)} incomplete todos")
         return False
-
-
-async def _handle_interrupt(
-    control: Optional["ControlManager"],
-    ui: Any | None,
-    session_id: str,
-    agent_config: AgentConfig,
-    agent_display_name: str,
-) -> tuple[bool, str | None]:
-    """Handle user interrupt. Returns (should_continue, user_input)."""
-    if not control or not control.should_interrupt():
-        return True, None
-
-    from wolo.control import ControlState
-
-    control._set_state(ControlState.WAIT_INPUT)
-    logger.info("Interrupted before LLM call")
-    user_input = await ui.wait_for_input_with_keyboard() if ui else None
-    control._set_state(ControlState.RUNNING)
-
-    if user_input:
-        add_user_message(session_id, user_input)
-        print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
-        return True, user_input
-    else:
-        return False, None
 
 
 async def _call_llm(
@@ -361,10 +279,6 @@ async def _call_llm(
         )
         llm_messages.append({"role": "system", "content": max_steps_warning})
 
-    # Wait if paused
-    if control:
-        await control.wait_if_paused()
-
     # Call LLM with streaming
     current_text_part = TextPart()
     assistant_msg.parts.append(current_text_part)
@@ -377,12 +291,10 @@ async def _call_llm(
     try:
         tools = get_all_tools(excluded_tools=excluded_tools or set())
         async for event in client.chat_completion(llm_messages, tools=tools):
-            if control:
-                if control.should_interrupt():
-                    logger.info("Interrupted during LLM streaming")
-                    interrupted_during_stream = True
-                    break
-                await control.wait_if_paused()
+            if control and control.should_interrupt():
+                logger.info("Interrupted during LLM streaming")
+                interrupted_during_stream = True
+                break
 
             if event.get("type") == "tool-call":
                 tool_calls_this_step.append(
@@ -409,7 +321,7 @@ async def agent_loop(
     agent_display_name: str = None,
     is_repl_mode: bool = False,
 ) -> Message:
-    """Main agent execution loop."""
+    """Main agent execution loop (simplified - no UI, no complex state)."""
     from wolo.agents import GENERAL_AGENT
 
     if agent_config is None:
@@ -417,9 +329,7 @@ async def agent_loop(
 
     # Get display name if not provided
     if agent_display_name is None:
-        from wolo.agent_names import get_random_agent_name
-
-        agent_display_name = get_random_agent_name()
+        agent_display_name = "Assistant"
 
     step = 0
 
@@ -444,15 +354,6 @@ async def agent_loop(
         _todos[session_id] = persisted_todos
         logger.debug(f"Loaded {len(persisted_todos)} todos from disk")
 
-    ui = None
-    if control:
-        from wolo.terminal import get_terminal_manager
-        from wolo.ui import SimpleUI, register_ui
-
-        terminal = get_terminal_manager()
-        ui = SimpleUI(control, terminal=terminal)
-        register_ui(ui)
-
     logger.info(
         f"Starting agent loop for session {session_id} (agent={agent_config.name}, max_steps={max_steps})"
     )
@@ -463,15 +364,6 @@ async def agent_loop(
     try:
         while step < max_steps:
             logger.debug(f"Agent loop step {step + 1}/{max_steps}")
-
-            # Step boundary check
-            should_continue, user_input = await _handle_step_boundary(
-                control, ui, session_id, agent_config, step, max_steps, agent_display_name
-            )
-            if not should_continue:
-                break
-            if user_input:
-                continue
 
             # Get message history
             messages = get_session_messages(session_id)
@@ -487,30 +379,24 @@ async def agent_loop(
             # Handle pending tools
             pending_tool_duration_ms = 0.0
             if last_assistant:
-                (
-                    should_continue,
-                    user_input,
-                    step,
-                    pending_tool_duration_ms,
-                ) = await _handle_pending_tools(
+                should_continue, step, pending_tool_duration_ms = await _handle_pending_tools(
                     last_assistant,
                     control,
-                    ui,
                     agent_config,
                     session_id,
                     config,
                     step,
-                    agent_display_name,
                     saver,
                 )
                 if not should_continue:
                     break
-                if user_input:
-                    continue
+
+            # Check for interrupt
+            if control and control.should_interrupt():
+                logger.info("Interrupted, exiting loop")
+                break
 
             # Check if we should exit
-            # Both REPL and non-REPL modes should check for new user messages
-            # (important for session resume with -r flag)
             has_new_user_message = False
             if last_user and last_assistant:
                 # Compare timestamps to see if user message is newer
@@ -537,13 +423,9 @@ async def agent_loop(
             logger.debug(f"Created new assistant message: {assistant_msg.id}")
 
             # Check for interrupt before LLM call
-            should_continue, user_input = await _handle_interrupt(
-                control, ui, session_id, agent_config, agent_display_name
-            )
-            if not should_continue:
+            if control and control.should_interrupt():
+                logger.info("Interrupted before LLM call, exiting")
                 break
-            if user_input:
-                continue
 
             # Call LLM
             try:
@@ -565,21 +447,10 @@ async def agent_loop(
 
             # Handle interrupt during streaming
             if interrupted:
-                from wolo.control import ControlState
-
-                control._set_state(ControlState.WAIT_INPUT)
                 assistant_msg.finished = True
                 assistant_msg.finish_reason = "interrupted"
-                logger.info("Waiting for user input after stream interrupt")
-                user_input = await ui.wait_for_input_with_keyboard() if ui else None
-                control._set_state(ControlState.RUNNING)
-
-                if user_input:
-                    add_user_message(session_id, user_input)
-                    print(f"\033[94m{agent_display_name}\033[0m: ", end="", flush=True)
-                    continue
-                else:
-                    break
+                logger.info("Stream interrupted, exiting loop")
+                break
 
             # Persist after LLM response
             update_message(session_id, assistant_msg)
@@ -667,11 +538,6 @@ async def agent_loop(
         # Flush any pending saves before cleanup
         saver.flush()
         remove_session_saver(session_id)
-
-        if ui:
-            from wolo.ui import unregister_ui
-
-            unregister_ui()
 
 
 async def process_event(

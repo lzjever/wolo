@@ -8,10 +8,12 @@ Features:
 - Tool aggregation from all servers
 - Node.js dependency handling
 - Stdio transport support via official SDK
+- Background initialization with callbacks
 """
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -26,6 +28,11 @@ except ImportError:
     from exceptiongroup import BaseExceptionGroup
 
 logger = logging.getLogger(__name__)
+
+# Type alias for server connection callback
+ServerConnectedCallback = Callable[[str, list[MCPTool]], Any]
+# Type alias for initialization complete callback
+InitCompleteCallback = Callable[[], Any]
 
 
 class ServerStatus(Enum):
@@ -59,6 +66,7 @@ class MCPServerManager:
     - Node.js fallback handling
     - Graceful error handling
     - Background initialization (non-blocking)
+    - Callbacks for server connection events
     """
 
     def __init__(
@@ -83,6 +91,10 @@ class MCPServerManager:
         self._init_task: asyncio.Task | None = None
         self._init_started: bool = False
         self._init_complete: bool = False
+
+        # Callbacks
+        self._on_server_connected: ServerConnectedCallback | None = None
+        self._on_init_complete: InitCompleteCallback | None = None
 
     def _check_node(self) -> bool:
         """Check if Node.js is available (cached)."""
@@ -190,6 +202,17 @@ class MCPServerManager:
             state.error = None
 
             logger.info(f"Started local MCP server {state.config.name}: {len(tools)} tools")
+
+            # Call callback if set
+            if self._on_server_connected:
+                try:
+                    result = self._on_server_connected(state.config.name, tools)
+                    # Handle async callbacks
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception as e:
+                    logger.warning(f"Callback error for {state.config.name}: {e}")
+
             return True
 
         except Exception as e:
@@ -225,6 +248,17 @@ class MCPServerManager:
             state.error = None
 
             logger.info(f"Started remote MCP server {state.config.name}: {len(tools)} tools")
+
+            # Call callback if set
+            if self._on_server_connected:
+                try:
+                    result = self._on_server_connected(state.config.name, tools)
+                    # Handle async callbacks
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception as e:
+                    logger.warning(f"Callback error for {state.config.name}: {e}")
+
             return True
 
         except Exception as e:
@@ -324,11 +358,44 @@ class MCPServerManager:
         self._init_task = asyncio.create_task(self._background_init())
         logger.info("MCP background initialization started")
 
+    def start_background_init_with_callback(
+        self,
+        on_connected: ServerConnectedCallback | None = None,
+        on_complete: InitCompleteCallback | None = None,
+    ) -> None:
+        """
+        Start background initialization with callbacks.
+
+        The on_connected callback is called each time a server connects successfully,
+        allowing immediate updates to tool registries and caches.
+
+        The on_complete callback is called when all servers have been attempted,
+        allowing final cache synchronization.
+
+        Args:
+            on_connected: Async or sync function called with (server_name, tools)
+                          when a server connects.
+            on_complete: Async or sync function called when initialization completes.
+        """
+        self._on_server_connected = on_connected
+        self._on_init_complete = on_complete
+        self.start_background_init()
+
     async def _background_init(self) -> None:
         """Background initialization task."""
         try:
             await self.start_all()
             logger.info("MCP background initialization complete")
+
+            # Call completion callback if set
+            if self._on_init_complete:
+                try:
+                    result = self._on_init_complete()
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception as e:
+                    logger.warning(f"Init complete callback error: {e}")
+
         except Exception as e:
             logger.error(f"MCP background initialization failed: {e}")
 

@@ -1,4 +1,4 @@
-"""Tests for execution modes."""
+"""Tests for execution modes (simplified)."""
 
 from wolo.modes import ExecutionMode, ModeConfig, QuotaConfig
 
@@ -14,33 +14,24 @@ def test_mode_config_solo():
     """Test ModeConfig for SOLO mode."""
     config = ModeConfig.for_mode(ExecutionMode.SOLO)
     assert config.mode == ExecutionMode.SOLO
-    assert config.enable_keyboard_shortcuts is True  # Changed: SOLO has shortcuts
     assert config.enable_question_tool is False  # SOLO: no questions
-    assert config.enable_ui_state is True  # Changed: SOLO has UI
     assert config.exit_after_task is True
-    assert config.wait_for_input_before_start is False
 
 
 def test_mode_config_coop():
     """Test ModeConfig for COOP mode."""
     config = ModeConfig.for_mode(ExecutionMode.COOP)
     assert config.mode == ExecutionMode.COOP
-    assert config.enable_keyboard_shortcuts is True
     assert config.enable_question_tool is True  # COOP: questions allowed
-    assert config.enable_ui_state is True
     assert config.exit_after_task is True
-    assert config.wait_for_input_before_start is False
 
 
 def test_mode_config_repl():
     """Test ModeConfig for REPL mode."""
     config = ModeConfig.for_mode(ExecutionMode.REPL)
     assert config.mode == ExecutionMode.REPL
-    assert config.enable_keyboard_shortcuts is True
     assert config.enable_question_tool is True
-    assert config.enable_ui_state is True
     assert config.exit_after_task is False
-    assert config.wait_for_input_before_start is False
 
 
 def test_quota_config():

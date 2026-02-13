@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2026-02-13
+
+### Fixed
+
+- **Tool output formatting**: Fixed tool name matching (`todowrite`/`todoread` without underscore) and metadata key (`total_lines` instead of `lines`) in CLI output module
+
 ## [0.13.1] - 2026-02-13
 
 ### Added

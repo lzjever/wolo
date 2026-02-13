@@ -1,4 +1,7 @@
-"""Tests for cli/execution.py - execution functions for running tasks, REPL, and watch modes."""
+"""Tests for cli/execution.py - execution functions for running tasks, REPL, and watch modes.
+
+Natural output style tests - no echoing user input, tool calls in natural language.
+"""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -14,40 +17,24 @@ class TestRunSingleTaskMode:
     @pytest.fixture
     def base_mocks(self):
         """Create base mocks for run_single_task_mode."""
-        # Functions imported at module level: patch via wolo.cli.execution.<name>
-        # Functions imported inline: patch at their original module
+        # Patch at the usage location (wolo.cli.execution) not the definition location
         with (
-            # Inline import in function body -> patch at original module
             patch("wolo.session.get_or_create_agent_display_name", return_value="Claude"),
-            # Module-level imports -> patch via wolo.cli.execution
             patch("wolo.cli.execution.get_manager") as mock_get_manager,
-            patch("wolo.cli.execution.create_ui") as mock_create_ui,
             patch("wolo.cli.execution.add_user_message"),
-            # Inline import -> patch at original module
-            patch("wolo.cli.events.show_agent_start") as mock_show_agent_start,
-            # Inline import -> patch at original module
             patch("wolo.watch_server.start_watch_server", new_callable=AsyncMock) as mock_watch,
-            # Module-level import -> patch via wolo.cli.execution
             patch("wolo.cli.execution.set_watch_server"),
             patch("wolo.cli.execution.agent_loop", new_callable=AsyncMock) as mock_agent_loop,
             patch("wolo.cli.execution.save_session"),
             patch("wolo.cli.execution.remove_manager"),
-            # Inline import -> patch at original module
             patch("wolo.session.clear_session_pid"),
-            # Inline import -> patch at original module
             patch("wolo.watch_server.stop_watch_server", new_callable=AsyncMock),
             patch("wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock),
-            # Inline import -> patch at original module
             patch("wolo.mcp_integration.shutdown_mcp", new_callable=AsyncMock),
         ):
             # Setup control mock
             mock_control = MagicMock()
             mock_get_manager.return_value = mock_control
-
-            # Setup UI mock
-            mock_ui = MagicMock()
-            mock_keyboard = MagicMock()
-            mock_create_ui.return_value = (mock_ui, mock_keyboard)
 
             # Setup watch server mock
             mock_watch.return_value = MagicMock()
@@ -60,11 +47,8 @@ class TestRunSingleTaskMode:
 
             yield {
                 "control": mock_control,
-                "ui": mock_ui,
-                "keyboard": mock_keyboard,
                 "agent_loop": mock_agent_loop,
                 "watch": mock_watch,
-                "show_agent_start": mock_show_agent_start,
             }
 
     @pytest.mark.asyncio
@@ -94,8 +78,7 @@ class TestRunSingleTaskMode:
 
         assert result == ExitCode.SUCCESS
         base_mocks["agent_loop"].assert_called_once()
-        base_mocks["keyboard"].start.assert_called_once()
-        base_mocks["keyboard"].stop.assert_called_once()
+        base_mocks["control"].start_running.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_keyboard_interrupt_returns_interrupted(self, base_mocks):
@@ -198,7 +181,6 @@ class TestRunSingleTaskMode:
 
         benchmark_file = tmp_path / "benchmark.json"
 
-        # Benchmark mode should work even if metrics return None
         result = await run_single_task_mode(
             config=config,
             session_id="test-session",
@@ -212,49 +194,11 @@ class TestRunSingleTaskMode:
             question_handler=None,
         )
 
-        # Should still return success even if metrics export returns None
         assert result == ExitCode.SUCCESS
 
     @pytest.mark.asyncio
-    async def test_ui_disabled_mode(self, base_mocks):
-        """Test execution with UI disabled."""
-        from wolo.cli.execution import run_single_task_mode
-        from wolo.config import Config
-        from wolo.modes import ModeConfig, QuotaConfig
-
-        config = MagicMock(spec=Config)
-        agent_config = MagicMock()
-        # Create a custom mode config with UI disabled
-        mode_config = ModeConfig(
-            mode=ExecutionMode.SOLO,
-            enable_keyboard_shortcuts=False,
-            enable_question_tool=False,
-            enable_ui_state=False,  # UI disabled
-            exit_after_task=True,
-            wait_for_input_before_start=False,
-        )
-        quota_config = QuotaConfig(max_steps=100)
-
-        result = await run_single_task_mode(
-            config=config,
-            session_id="test-session",
-            agent_config=agent_config,
-            mode_config=mode_config,
-            quota_config=quota_config,
-            message_text="Test message",
-            save_session_flag=False,
-            benchmark_mode=False,
-            benchmark_output="",
-            question_handler=None,
-        )
-
-        assert result == ExitCode.SUCCESS
-        # Keyboard should not be started in silent mode
-        base_mocks["keyboard"].start.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_solo_mode_hides_shortcuts_and_agent_header(self, base_mocks, capsys):
-        """SOLO mode should suppress shortcuts and agent header output."""
+    async def test_session_banner_not_shown_in_solo(self, base_mocks, capsys):
+        """Session banner should NOT be shown in SOLO mode."""
         from wolo.cli.execution import run_single_task_mode
         from wolo.config import Config
         from wolo.modes import ModeConfig, QuotaConfig
@@ -278,10 +222,9 @@ class TestRunSingleTaskMode:
         )
 
         assert result == ExitCode.SUCCESS
-        base_mocks["ui"].print_shortcuts.assert_not_called()
-        base_mocks["show_agent_start"].assert_not_called()
         captured = capsys.readouterr()
-        assert "[test-session]" in captured.out
+        # SOLO mode should not show session banner
+        assert "[test-session]" not in captured.out
 
 
 class TestRunReplMode:
@@ -290,44 +233,25 @@ class TestRunReplMode:
     @pytest.fixture
     def base_mocks(self):
         """Create base mocks for run_repl_mode."""
-        # Functions imported at module level: patch via wolo.cli.execution.<name>
-        # Functions imported inline: patch at their original module
+        # Patch at the usage location (wolo.cli.execution) not the definition location
         with (
-            # Inline import -> patch at original module
             patch("wolo.session.get_or_create_agent_display_name", return_value="Claude"),
-            # Module-level imports -> patch via wolo.cli.execution
             patch("wolo.cli.execution.get_manager") as mock_get_manager,
-            patch("wolo.cli.execution.create_ui") as mock_create_ui,
-            # Inline import -> patch at original module
-            patch("wolo.question_ui.setup_question_handler"),
-            # Module-level import -> patch via wolo.cli.execution
             patch("wolo.cli.execution.add_user_message"),
-            # Inline import -> patch at original module
-            patch("wolo.cli.events.show_agent_start"),
-            # Inline import -> patch at original module
+            patch("wolo.cli.execution.print_repl_prompt"),
             patch("wolo.watch_server.start_watch_server", new_callable=AsyncMock) as mock_watch,
-            # Module-level import -> patch via wolo.cli.execution
             patch("wolo.cli.execution.set_watch_server"),
             patch("wolo.cli.execution.agent_loop", new_callable=AsyncMock) as mock_agent_loop,
             patch("wolo.cli.execution.save_session"),
             patch("wolo.cli.execution.remove_manager"),
-            # Inline import -> patch at original module
             patch("wolo.session.clear_session_pid"),
-            # Inline import -> patch at original module
             patch("wolo.watch_server.stop_watch_server", new_callable=AsyncMock),
             patch("wolo.cli.execution.WoloLLMClient.close_all_sessions", new_callable=AsyncMock),
-            # Inline import -> patch at original module (note: mcp_integration not mcp)
             patch("wolo.mcp_integration.shutdown_mcp", new_callable=AsyncMock),
         ):
             # Setup control mock
             mock_control = MagicMock()
             mock_get_manager.return_value = mock_control
-
-            # Setup UI mock with async prompt_for_input
-            mock_ui = MagicMock()
-            mock_ui.prompt_for_input = AsyncMock(return_value="")  # Default: exit on empty
-            mock_keyboard = MagicMock()
-            mock_create_ui.return_value = (mock_ui, mock_keyboard)
 
             # Setup watch server mock
             mock_watch.return_value = MagicMock()
@@ -340,8 +264,6 @@ class TestRunReplMode:
 
             yield {
                 "control": mock_control,
-                "ui": mock_ui,
-                "keyboard": mock_keyboard,
                 "agent_loop": mock_agent_loop,
                 "watch": mock_watch,
             }
@@ -353,25 +275,24 @@ class TestRunReplMode:
         from wolo.config import Config
         from wolo.modes import ModeConfig, QuotaConfig
 
-        # First call processes initial message, second call returns empty (exit)
-        base_mocks["ui"].prompt_for_input = AsyncMock(return_value="")
-
         config = MagicMock(spec=Config)
         agent_config = MagicMock()
         mode_config = ModeConfig.for_mode(ExecutionMode.COOP)
         quota_config = QuotaConfig(max_steps=100)
 
-        result = await run_repl_mode(
-            config=config,
-            session_id="test-session",
-            agent_config=agent_config,
-            mode_config=mode_config,
-            quota_config=quota_config,
-            initial_message="First message",
-            save_session_flag=False,
-            benchmark_mode=False,
-            benchmark_output="",
-        )
+        # Mock input() to return empty string (exit)
+        with patch("builtins.input", return_value=""):
+            result = await run_repl_mode(
+                config=config,
+                session_id="test-session",
+                agent_config=agent_config,
+                mode_config=mode_config,
+                quota_config=quota_config,
+                initial_message="First message",
+                save_session_flag=False,
+                benchmark_mode=False,
+                benchmark_output="",
+            )
 
         assert result == ExitCode.SUCCESS
         base_mocks["agent_loop"].assert_called_once()
@@ -383,32 +304,30 @@ class TestRunReplMode:
         from wolo.config import Config
         from wolo.modes import ModeConfig, QuotaConfig
 
-        # First call raises error, next prompt returns empty (exit)
         mock_result = MagicMock()
         mock_result.finish_reason = "end_turn"
         base_mocks["agent_loop"].side_effect = [RuntimeError("Test error"), mock_result]
-        base_mocks["ui"].prompt_for_input = AsyncMock(return_value="")
 
         config = MagicMock(spec=Config)
         agent_config = MagicMock()
         mode_config = ModeConfig.for_mode(ExecutionMode.COOP)
         quota_config = QuotaConfig(max_steps=100)
 
-        result = await run_repl_mode(
-            config=config,
-            session_id="test-session",
-            agent_config=agent_config,
-            mode_config=mode_config,
-            quota_config=quota_config,
-            initial_message="First message",
-            save_session_flag=False,
-            benchmark_mode=False,
-            benchmark_output="",
-        )
+        # First call processes initial message (throws error), second call with empty input exits
+        with patch("builtins.input", return_value=""):
+            result = await run_repl_mode(
+                config=config,
+                session_id="test-session",
+                agent_config=agent_config,
+                mode_config=mode_config,
+                quota_config=quota_config,
+                initial_message="First message",
+                save_session_flag=False,
+                benchmark_mode=False,
+                benchmark_output="",
+            )
 
-        # REPL should exit successfully after error recovery
         assert result == ExitCode.SUCCESS
-        # Control should be reset after error
         base_mocks["control"].reset.assert_called()
 
 

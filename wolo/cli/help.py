@@ -71,9 +71,10 @@ BASIC USAGE:
 SESSION OPTIONS:
     -s, --session <name>    Create/use named session
     -r, --resume <id>       Resume session, creates if not exists
-                            (REPL mode by default)
-    -r, --resume <id> --solo "prompt"
-                            Resume session (one-shot execution)
+                            (restores previous mode: solo/coop/repl)
+    -r <id> --solo "prompt" Resume session (force solo mode)
+    -r <id> --coop "prompt" Resume session (force coop mode)
+    -r <id> --repl          Resume session (force REPL mode)
 
 QUICK COMMANDS:
     -l, --list              List all sessions
@@ -94,13 +95,6 @@ OTHER OPTIONS:
 
     If --base-url is specified, all three (--base-url, --model, --api-key) are required.
     Otherwise, Wolo uses endpoints from config file.
-
-OUTPUT OPTIONS:
-    --output-style <s>      Output style: minimal, default, verbose
-    --no-color              Disable color output
-    --show-reasoning        Show model reasoning/thinking
-    --hide-reasoning        Hide model reasoning/thinking
-    --json                  JSON output (implies minimal style)
 
 DEBUG OPTIONS:
     --debug-llm <file>      Log LLM requests/responses
@@ -125,25 +119,13 @@ MEMORY SYSTEM:
     Memories are automatically loaded before each LLM call. Use the
     memory_save tool to create new memories from conversations.
 
-    Memory file format (.md):
-    ```markdown
-    ---
-    title: Memory Title
-    tags: [tag1, tag2]
-    created_at: 2026-02-12T10:30:00
-    updated_at: 2026-02-12T10:30:00
-    source_session: AgentName_260212_103000
-    ---
-    # Memory content in markdown...
-    ```
-
 EXAMPLES:
     wolo "fix the bug in main.py"
     git diff | wolo "write commit message"
     wolo --coop "design login feature"
     wolo --repl "let's explore the codebase"
-    wolo -r mysession                        # Resume in REPL
-    wolo -r mysession --solo "add tests"     # Resume one-shot
+    wolo -r mysession                        # Resume (restores mode)
+    wolo -r mysession --solo "add tests"     # Resume, force solo
     wolo -r new_session "start fresh"        # Creates new session
 
 SESSION MANAGEMENT:
@@ -175,7 +157,7 @@ USAGE:
 SUBCOMMANDS:
     list             List all sessions
     show <id>        Show session details (non-blocking)
-    resume <id>      Resume session in REPL mode (blocking, creates if not exists)
+    resume <id>      Resume session (restores previous mode)
     create [name]    Create a new session
     watch <id>       Watch a running session (read-only)
     delete <id>      Delete a session
@@ -184,23 +166,29 @@ SUBCOMMANDS:
 QUICK OPTIONS:
     wolo -l                  Same as: wolo session list
     wolo -w <id>             Same as: wolo session watch <id>
-    wolo -r <id>             Resume or create session (REPL mode)
-    wolo -r <id> --solo "p"  Resume or create session (one-shot)
+    wolo -r <id>             Resume or create session (restores mode)
+    wolo -r <id> --solo "p"  Resume or create session (force solo)
+    wolo -r <id> --coop "p"  Resume or create session (force coop)
+    wolo -r <id> --repl      Resume or create session (force REPL)
+
+MODE RESTORATION:
+    When resuming a session with '-r <id>', Wolo restores the previous
+    execution mode (solo/coop/repl). Use mode flags to override.
 
 EXAMPLES:
     wolo session list
     wolo session show myproject
-    wolo session resume myproject           # Enter REPL
+    wolo session resume myproject           # Restores previous mode
     wolo -r myproject                       # Same as above
-    wolo -r myproject --solo "add tests"    # One-shot execution
+    wolo -r myproject --solo "add tests"    # Force solo mode
     wolo -r new_session "start fresh"       # Creates new session
-    echo "task" | wolo -r myproject         # REPL with initial message
+    echo "task" | wolo -r myproject         # With initial message
 
 NOTE:
     - 'session show' displays info and exits (non-blocking)
-    - 'session resume' and '-r' both enter REPL mode by default
+    - '-r <id>' restores the session's previous execution mode
     - '-r <id>' creates a new session if the ID doesn't exist
-    - Use '-r <id> --solo "prompt"' for one-shot execution
+    - Use mode flags (--solo/--coop/--repl) to override restored mode
 """
         print(help_text)
     elif command == "config":
@@ -262,6 +250,7 @@ EXAMPLES:
 TO RESUME AN EXISTING SESSION:
     wolo -r <session_id>
     wolo session resume <session_id>
+    (Session's previous mode will be restored)
 """
         print(help_text)
     else:
@@ -300,22 +289,25 @@ EXAMPLES:
         elif subcommand == "resume":
             print("""wolo session resume <id>
 
-Resume a session in REPL mode for continued conversation.
-This is a blocking command that enters interactive REPL.
+Resume a session, restoring its previous execution mode (solo/coop/repl).
+This is a blocking command that continues the conversation.
 
 If the session doesn't exist, it will be created automatically.
 
 If stdin has content (pipe), it becomes the first message.
 
-EXAMPLES:
-    wolo session resume myproject              # Enter REPL
-    wolo -r myproject                          # Same as above
-    wolo -r new_session "start fresh"          # Creates new session
-    echo "task" | wolo -r myproject            # REPL with initial msg
+MODE RESTORATION:
+    The session's previous mode is automatically restored.
+    Use mode flags to override: --solo, --coop, --repl
 
-FOR ONE-SHOT EXECUTION:
-    Use '-r' with '--solo' flag:
-    wolo -r myproject --solo "your prompt"
+EXAMPLES:
+    wolo session resume myproject              # Restores previous mode
+    wolo -r myproject                          # Same as above
+    wolo -r myproject --solo "add tests"       # Force solo mode
+    wolo -r myproject --coop "help me"         # Force coop mode
+    wolo -r myproject --repl                   # Force REPL mode
+    wolo -r new_session "start fresh"          # Creates new session
+    echo "task" | wolo -r myproject            # With initial message
 """)
         elif subcommand == "watch":
             print("""wolo session watch <id>

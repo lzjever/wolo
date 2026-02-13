@@ -34,7 +34,7 @@ class SessionCommandGroup(BaseCommand):
 
     def execute(self, args: ParsedArgs) -> int:
         """Route to subcommand."""
-        subcommand = args.subcommand or "list"  # Default to list
+        subcommand = args.subcommand or "list"
 
         if subcommand == "create":
             return SessionCreateCommand().execute(args)
@@ -72,46 +72,29 @@ class SessionCreateCommand(BaseCommand):
 
     def validate_args(self, args: ParsedArgs) -> tuple[bool, str]:
         """Validate create command arguments."""
-        # Optional name, no validation needed
         return (True, "")
 
     def execute(self, args: ParsedArgs) -> int:
         """Execute create command."""
-        from wolo.agent_names import get_random_agent_name
         from wolo.cli.utils import print_session_info
         from wolo.session import create_session, get_session_status
 
-        # Get session name from positional args
         session_name = None
         if args.positional_args:
             session_name = args.positional_args[0]
 
         try:
             if session_name:
-                # Check if session already exists
                 status = get_session_status(session_name)
                 if status.get("exists"):
                     print(f"Error: Session '{session_name}' already exists", file=sys.stderr)
                     return ExitCode.SESSION_ERROR
                 session_id = create_session(session_id=session_name)
             else:
-                # Auto-generate name
-                agent_name = get_random_agent_name()
-                session_id = create_session(agent_name=agent_name)
+                session_id = create_session()
 
             print(f"Created session: {session_id}")
-            # Create output config for print_session_info
-            from wolo.cli.output import OutputConfig
-            from wolo.config import Config
-
-            output_config = OutputConfig.from_args_and_config(
-                output_style=args.execution_options.output_style,
-                no_color=args.execution_options.no_color,
-                show_reasoning=args.execution_options.show_reasoning,
-                json_output=args.execution_options.json_output,
-                config_data=Config._load_config_file(),
-            )
-            print_session_info(session_id, show_resume_hints=True, output_config=output_config)
+            print_session_info(session_id, show_resume_hints=True)
             return ExitCode.SUCCESS
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
@@ -153,28 +136,21 @@ class SessionListCommand(BaseCommand):
                 pid = s.get("pid")
                 workdir = s.get("workdir")
 
-                # Status display
                 status = "(Running)" if is_running else "(Stopped)"
                 pid_str = f" PID:{pid}" if pid and is_running else ""
 
                 print(f"  {session_id}{pid_str}")
                 print(f"    {created_str}    {status}    ({message_count} messages)")
                 if workdir:
-                    # Truncate long paths
                     display_workdir = workdir if len(workdir) <= 50 else "..." + workdir[-47:]
-                    print(f"    📁 {display_workdir}")
+                    print(f"    Workdir: {display_workdir}")
                 print()
             print(f"{len(sessions)} session(s) in ~/.wolo/sessions/")
         return ExitCode.SUCCESS
 
 
 class SessionShowCommand(BaseCommand):
-    """
-    wolo session show <id>
-
-    Display session information without entering REPL.
-    This is a non-blocking command that shows info and exits.
-    """
+    """wolo session show <id>"""
 
     @property
     def name(self) -> str:
@@ -207,31 +183,12 @@ class SessionShowCommand(BaseCommand):
             print(f"Error: Session '{session_id}' not found", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
-        # Show detailed info with resume hints
-        # Create output config for print_session_info
-        from wolo.cli.output import OutputConfig
-        from wolo.config import Config
-
-        output_config = OutputConfig.from_args_and_config(
-            output_style=args.execution_options.output_style,
-            no_color=args.execution_options.no_color,
-            show_reasoning=args.execution_options.show_reasoning,
-            json_output=args.execution_options.json_output,
-            config_data=Config._load_config_file(),
-        )
-        print_session_info(session_id, show_resume_hints=True, output_config=output_config)
+        print_session_info(session_id, show_resume_hints=True)
         return ExitCode.SUCCESS
 
 
 class SessionResumeCommand(BaseCommand):
-    """
-    wolo session resume <id>
-
-    Resume a session in REPL mode for continued conversation.
-    This is a blocking command that enters interactive REPL.
-
-    If stdin has content (pipe), it becomes the first message.
-    """
+    """wolo session resume <id>"""
 
     @property
     def name(self) -> str:
@@ -248,12 +205,7 @@ class SessionResumeCommand(BaseCommand):
         return (True, "")
 
     def execute(self, args: ParsedArgs) -> int:
-        """
-        Execute resume command.
-
-        Enters REPL mode with the specified session.
-        If pipe input is provided, it becomes the first message.
-        """
+        """Execute resume command."""
         is_valid, error_msg = self.validate_args(args)
         if not is_valid:
             print(error_msg, file=sys.stderr)
@@ -270,42 +222,25 @@ class SessionResumeCommand(BaseCommand):
             print(f"Error: Session '{session_id}' not found", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
-        # Check if already running
         if status.get("is_running"):
             pid = status.get("pid")
             print(f"Error: Session '{session_id}' is already running (PID: {pid})", file=sys.stderr)
-            print(f"       Use 'wolo -w {session_id}' to watch it.", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
-        # Acquire lock
         if not check_and_set_session_pid(session_id):
             print(f"Error: Failed to acquire session lock for: {session_id}", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
         try:
-            # Load session
             load_session(session_id)
 
-            # Check workdir match (warning only, don't block)
             from wolo.cli.utils import check_workdir_match, print_workdir_warning
 
             matches, session_workdir, current_workdir = check_workdir_match(session_id)
             if not matches and session_workdir:
                 print_workdir_warning(session_workdir, current_workdir)
 
-            # Show session info
-            # Create output config for print_session_info
-            from wolo.cli.output import OutputConfig
-            from wolo.config import Config
-
-            output_config = OutputConfig.from_args_and_config(
-                output_style=args.execution_options.output_style,
-                no_color=args.execution_options.no_color,
-                show_reasoning=args.execution_options.show_reasoning,
-                json_output=args.execution_options.json_output,
-                config_data=Config._load_config_file(),
-            )
-            print_session_info(session_id, show_resume_hints=False, output_config=output_config)
+            print_session_info(session_id, show_resume_hints=False)
 
             # Get initial message from pipe or remaining args
             initial_message = ""
@@ -314,14 +249,11 @@ class SessionResumeCommand(BaseCommand):
             elif len(args.positional_args) > 1:
                 initial_message = " ".join(args.positional_args[1:])
 
-            # Enter REPL mode
-
             # Prepare args for REPL
             args.session_options.resume_id = session_id
             args.execution_options.mode = ExecutionMode.REPL
             args.message = initial_message
 
-            # Delegate to REPL command with existing session
             return self._run_repl_with_session(args, session_id, initial_message)
 
         except (FileNotFoundError, ValueError) as e:
@@ -341,7 +273,6 @@ class SessionResumeCommand(BaseCommand):
         from wolo.config import Config
         from wolo.modes import ExecutionMode, ModeConfig, QuotaConfig
 
-        # Setup configuration
         try:
             config = Config.from_env(
                 api_key=args.execution_options.api_key,
@@ -356,7 +287,6 @@ class SessionResumeCommand(BaseCommand):
             print(f"Error: {e}", file=sys.stderr)
             return ExitCode.CONFIG_ERROR
 
-        # Validate agent type
         if args.execution_options.agent_type not in AGENTS:
             print(
                 f"Error: Unknown agent type '{args.execution_options.agent_type}'", file=sys.stderr
@@ -367,16 +297,6 @@ class SessionResumeCommand(BaseCommand):
         mode_config = ModeConfig.for_mode(ExecutionMode.REPL)
         quota_config = QuotaConfig(max_steps=args.execution_options.max_steps)
 
-        # Setup output configuration and event handlers
-        from wolo.cli.output import OutputConfig
-
-        output_config = OutputConfig.from_args_and_config(
-            output_style=args.execution_options.output_style,
-            no_color=args.execution_options.no_color,
-            show_reasoning=args.execution_options.show_reasoning,
-            json_output=args.execution_options.json_output,
-            config_data=Config._load_config_file(),
-        )
         workdir = args.execution_options.workdir
         workdir_to_use = os.path.abspath(workdir) if workdir else None
         initialize_path_guard_for_session(
@@ -385,9 +305,8 @@ class SessionResumeCommand(BaseCommand):
             workdir=workdir_to_use,
             cli_paths=args.execution_options.allow_paths,
         )
-        setup_event_handlers(output_config)
+        setup_event_handlers()
 
-        # Setup MCP if needed
         async def setup_mcp():
             if config.claude.enabled or config.mcp.enabled:
                 try:
@@ -399,7 +318,6 @@ class SessionResumeCommand(BaseCommand):
 
                     logging.getLogger(__name__).warning(f"Failed to initialize MCP: {e}")
 
-        # Run REPL
         async def run_repl():
             await setup_mcp()
             return await run_repl_mode(
@@ -412,7 +330,6 @@ class SessionResumeCommand(BaseCommand):
                 args.execution_options.save_session,
                 args.execution_options.benchmark_mode,
                 args.execution_options.benchmark_output,
-                output_config,  # Pass output_config for minimal mode check
             )
 
         try:
@@ -454,7 +371,6 @@ class SessionWatchCommand(BaseCommand):
 
     def execute(self, args: ParsedArgs) -> int:
         """Execute watch command."""
-        # Get session ID from positional args or watch_id option
         session_id = (
             args.positional_args[0] if args.positional_args else args.session_options.watch_id
         )
@@ -462,15 +378,12 @@ class SessionWatchCommand(BaseCommand):
             print("Error: session watch requires a session ID", file=sys.stderr)
             return ExitCode.ERROR
 
-        # Import watch mode function
         from wolo.cli.async_utils import _suppress_mcp_shutdown_errors, safe_async_run
         from wolo.cli.execution import run_watch_mode
 
-        # Run watch mode
         try:
             return safe_async_run(run_watch_mode(session_id))
         except RuntimeError:
-            # Event loop already running
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
@@ -483,7 +396,6 @@ class SessionWatchCommand(BaseCommand):
                     loop.set_exception_handler(_suppress_mcp_shutdown_errors)
                     return loop.run_until_complete(run_watch_mode(session_id))
             except Exception:
-                # Fallback: use safe_async_run which creates a new loop
                 return safe_async_run(run_watch_mode(session_id))
 
 
@@ -515,13 +427,11 @@ class SessionDeleteCommand(BaseCommand):
 
         from wolo.session import delete_session, get_session_status
 
-        # Check if session exists
         status = get_session_status(session_id)
         if not status.get("exists"):
             print(f"Error: Session '{session_id}' not found", file=sys.stderr)
             return ExitCode.SESSION_ERROR
 
-        # Check if running
         if status.get("is_running"):
             pid = status.get("pid")
             print(
@@ -552,7 +462,6 @@ class SessionCleanCommand(BaseCommand):
 
     def validate_args(self, args: ParsedArgs) -> tuple[bool, str]:
         """Validate clean command arguments."""
-        # Optional days parameter
         if args.positional_args:
             try:
                 days = int(args.positional_args[0])
@@ -569,7 +478,7 @@ class SessionCleanCommand(BaseCommand):
             print(error_msg, file=sys.stderr)
             return ExitCode.ERROR
 
-        days = 30  # Default
+        days = 30
         if args.positional_args:
             try:
                 days = int(args.positional_args[0])
@@ -587,18 +496,16 @@ class SessionCleanCommand(BaseCommand):
             session_id = s.get("id")
             created = s.get("created_at", 0)
 
-            # Skip if running
             status = get_session_status(session_id)
             if status.get("is_running"):
                 continue
 
-            # Delete if older than cutoff
             if created < cutoff_time:
                 try:
                     delete_session(session_id)
                     deleted_count += 1
                 except Exception:
-                    pass  # Continue on error
+                    pass
 
         print(f"Cleaned {deleted_count} session(s) older than {days} days")
         return ExitCode.SUCCESS

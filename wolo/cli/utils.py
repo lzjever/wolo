@@ -1,27 +1,41 @@
 """
 CLI utility functions for Wolo.
+Simplified version: no colors.
 """
 
 import sys
-from typing import TYPE_CHECKING
 
 from wolo.cli.exit_codes import ExitCode
 from wolo.cli.parser import ParsedArgs
 
-if TYPE_CHECKING:
-    from wolo.cli.output.base import OutputConfig
+
+def print_error(msg: str) -> None:
+    """Print error message to stderr."""
+    print(f"Error: {msg}", file=sys.stderr)
+
+
+def print_warning(msg: str) -> None:
+    """Print warning message to stderr."""
+    print(f"Warning: {msg}", file=sys.stderr)
+
+
+def print_success(msg: str) -> None:
+    """Print success message to stdout."""
+    print(msg)
+
+
+def print_info(msg: str) -> None:
+    """Print info message to stdout."""
+    print(msg)
 
 
 def show_first_run_message() -> None:
     """
     Display first-run message to user.
-
-    Prints message to stderr and exits with CONFIG_ERROR code.
     This function does NOT return - it calls sys.exit().
     """
-    print(
-        "Wolo is not configured. Please run 'wolo config init' to set up your configuration.",
-        file=sys.stderr,
+    print_error(
+        "Wolo is not configured. Please run 'wolo config init' to set up your configuration."
     )
     sys.exit(ExitCode.CONFIG_ERROR)
 
@@ -30,16 +44,12 @@ def get_message_from_sources(args: ParsedArgs) -> tuple[str, bool]:
     """
     Get message from parsed arguments.
 
-    The parser now handles dual input (pipe + CLI) concatenation,
-    so this function simply returns the combined message.
-
     Args:
         args: Parsed arguments
 
     Returns:
         (message, has_message) tuple
     """
-    # Message is already combined by parser using combine_inputs()
     if args.message:
         return (args.message, True)
 
@@ -49,7 +59,6 @@ def get_message_from_sources(args: ParsedArgs) -> tuple[str, bool]:
 def print_session_info(
     session_id: str,
     show_resume_hints: bool = True,
-    output_config: "OutputConfig | None" = None,
 ) -> None:
     """
     Print session information.
@@ -57,7 +66,6 @@ def print_session_info(
     Args:
         session_id: Session ID
         show_resume_hints: Whether to show resume command hints
-        output_config: Output configuration for style-specific formatting.
     """
     from datetime import datetime
 
@@ -94,7 +102,7 @@ def print_session_info(
         display_workdir = None
 
     # Unified banner format for all modes
-    print("━" * 60)
+    print("-" * 60)
     print(f"  Session:   {session_id}")
     print(f"  Agent:     {agent_name}")
     print(f"  Created:   {created_str}")
@@ -103,7 +111,7 @@ def print_session_info(
         print(f"  Workdir:   {display_workdir}")
     if show_resume_hints:
         print(f'  Resume:    wolo -r {session_id} "your prompt"')
-    print("━" * 60)
+    print("-" * 60)
     print()
 
 
@@ -132,9 +140,6 @@ def check_workdir_match(session_id: str) -> tuple[bool, str | None, str]:
 
     Returns:
         (matches, session_workdir, current_workdir)
-        - matches: True if directories match (or session has no workdir)
-        - session_workdir: The session's stored workdir (may be None)
-        - current_workdir: Current working directory
     """
     import os
 
@@ -150,7 +155,6 @@ def check_workdir_match(session_id: str) -> tuple[bool, str | None, str]:
 
     session_workdir = metadata.get("workdir")
 
-    # If no workdir stored, consider it a match (backward compatibility)
     if session_workdir is None:
         return (True, None, current_workdir)
 
@@ -177,10 +181,10 @@ def handle_keyboard_interrupt(session_id: str) -> int:
         from wolo.session import save_session
 
         save_session(session_id)
-        print(f"Session saved: {session_id}", file=sys.stderr)
+        print_success(f"Session saved: {session_id}")
         print(f'Resume with: wolo -r {session_id} "your prompt"', file=sys.stderr)
     except Exception as e:
-        print(f"Warning: Failed to save session: {e}", file=sys.stderr)
+        print_warning(f"Failed to save session: {e}")
     return ExitCode.INTERRUPTED
 
 
@@ -192,13 +196,8 @@ def print_workdir_warning(session_workdir: str, current_workdir: str) -> None:
         session_workdir: Session's stored working directory
         current_workdir: Current working directory
     """
-    # ANSI colors
-    yellow = "\033[93m"
-    dim = "\033[90m"
-    reset = "\033[0m"
-
-    print(f"{yellow}⚠️  Directory mismatch{reset}")
+    print("Warning: Directory mismatch")
     print(f"   Session was created in: {session_workdir}")
     print(f"   Current directory:      {current_workdir}")
-    print(f"{dim}   (Use -C/--workdir to override, or cd to the original directory){reset}")
+    print("   (Use -C/--workdir to override, or cd to the original directory)")
     print()

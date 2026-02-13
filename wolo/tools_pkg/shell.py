@@ -7,8 +7,6 @@ import time
 import uuid
 from typing import Any
 
-from rich.console import Console
-
 from wolo.tools_pkg.constants import MAX_OUTPUT_LINES, MAX_SHELL_HISTORY
 from wolo.truncate import truncate_output
 
@@ -78,10 +76,10 @@ def should_allow_shell_command(
         if pattern["id"] in approved:
             continue
 
-        console = Console()
-        console.print("\n[yellow]High-Risk Shell Command Detected[/yellow]")
-        console.print(f"Pattern: [cyan]{pattern['description']}[/cyan]")
-        console.print(f"Command: [cyan]{command}[/cyan]")
+        print()
+        print("High-Risk Shell Command Detected")
+        print(f"Pattern: {pattern['description']}")
+        print(f"Command: {command}")
 
         if not sys.stdin.isatty():
             return False, (
@@ -90,11 +88,10 @@ def should_allow_shell_command(
             )
 
         while True:
-            response = (
-                console.input("\n[yellow]Allow?[/yellow] [y=once / a=session / n=deny] ")
-                .strip()
-                .lower()
-            )
+            try:
+                response = input("\nAllow? [y=once / a=session / n=deny] ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                response = "n"
             if response == "y":
                 break
             if response == "a":
